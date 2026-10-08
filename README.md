@@ -8,7 +8,7 @@ grows into a real question, it moves here.
 
 | Project | Question | Data |
 |---|---|---|
-| _none yet_ | | |
+| [man-united-2017-18](man-united-2017-18/) | How did Manchester United move the ball in 2017-18? | Wyscout public events (Pappalardo et al.) |
 
 Give each project its own folder with a `README.md` (the question, the data,
 how to run it) and a `requirements.txt`, so each one stands on its own.
