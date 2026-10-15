@@ -3,3 +3,6 @@ __pycache__/
 .venv/
 venv/
 .ipynb_checkpoints/
+
+# nflverse downloads (large; fetch with the commands in each project README)
+data
