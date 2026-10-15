@@ -210,10 +210,16 @@ def main():
     ap.add_argument("--model-weight", type=float, default=Config.model_weight)
     a = ap.parse_args()
 
-    # DEN: CB Surtain II + S Hufanga out, CB Moss questionable -> DEN pass D worse
-    # SEA: RB Charbonnet (and Price) out -> SEA run game weaker
+    # Per-starter effects from injury_test.py (2024-26, 1,054 team-games):
+    #   starting DB out: +0.008 pass / +0.012 rush EPA allowed; starting LB out: +0.043 / +0.023
+    #   RB1 out: no measurable effect.
+    # DEN: Surtain II + Hufanga out, Moss questionable (questionable starters sit ~32%) -> 2.32 DBs
+    # SEA: LB Drake Thomas out (full-time starter). Charbonnet hasn't played in 2026, so his
+    #      absence is already in SEA's ratings; RB1 by snaps (Wilson) is active.
+    den_db_out, sea_lb_out = 2.32, 1
     cfg = Config(model_weight=a.model_weight,
-                 injuries={("SEA", "DEN"): (+0.07, -0.03)})
+                 injuries={("SEA", "DEN"): (0.008 * den_db_out, 0.012 * den_db_out),
+                           ("DEN", "SEA"): (0.043 * sea_lb_out, 0.023 * sea_lb_out)})
 
     data, outd = Path(a.data_dir), Path(a.out_dir)
     outd.mkdir(parents=True, exist_ok=True)

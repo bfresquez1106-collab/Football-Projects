@@ -1,8 +1,8 @@
 {
   "game_id": "2026_06_SEA_DEN",
   "model_weight": 0.0,
-  "margin_model": -4.342210702277946,
-  "total_model": 38.16821397962749,
+  "margin_model": -1.694397816063507,
+  "total_model": 40.04003153163485,
   "margin_blend": -2.5,
   "total_blend": 40.5,
   "home_wp": 0.4232530404077802,
@@ -30,21 +30,21 @@
     },
     {
       "lever": "DEN offense pass-heavier by 10pp",
-      "margin_pts": 0.43,
-      "wp": 0.436,
-      "wp_delta_pp": 1.3
+      "margin_pts": 0.49,
+      "wp": 0.4379,
+      "wp_delta_pp": 1.5
     },
     {
       "lever": "Push SEA run-heavier by 10pp",
-      "margin_pts": 0.73,
-      "wp": 0.4448,
-      "wp_delta_pp": 2.2
+      "margin_pts": 0.38,
+      "wp": 0.4344,
+      "wp_delta_pp": 1.1
     },
     {
       "lever": "Stack all of the above",
-      "margin_pts": 9.57,
-      "wp": 0.7027,
-      "wp_delta_pp": 27.9
+      "margin_pts": 9.29,
+      "wp": 0.695,
+      "wp_delta_pp": 27.2
     }
   ]
 }
