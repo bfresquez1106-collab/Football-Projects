@@ -122,5 +122,6 @@ python3 injury_test.py                   # ~1 minute
 python3 scenarios.py
 ```
 
-Data: [nflverse](https://github.com/nflverse/nflverse-data) play-by-play and schedules. Injury
-adjustments are judgement calls set in `model.py` (`Config.injuries`), not fitted values.
+Data: [nflverse](https://github.com/nflverse/nflverse-data) play-by-play, schedules, injury reports
+and snap counts. Tonight's injury adjustments in `model.py` use the per-starter effects from
+`injury_test.py`; who counts as out is still read from the injury report by hand.
