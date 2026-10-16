@@ -11,6 +11,7 @@ The weekly run. Scheduled Tue / Thu / Sat mornings, or run by hand:
 Run:  python3 weekly.py               (or --no-fetch to reuse downloaded data)
 """
 import argparse
+import hashlib
 import json
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -26,8 +27,16 @@ from nflmodel.injuries import EFFECTS, team_missing
 from nflmodel.ratings import Ratings, training_frame
 
 LOG = Path("forecast_log.csv")
+
+
+def model_version():
+    """Fingerprint of the model's settings files: changes whenever the model itself changes."""
+    h = hashlib.sha256()
+    for f in ("params.json", "qb_params.json"):
+        h.update(Path(f).read_bytes())
+    return h.hexdigest()[:8]
 LOG_COLS = ["game_id", "season", "week", "home", "away", "logged_at", "kickoff", "home_pts", "away_pts",
-            "margin", "total", "home_wp", "elo_wp", "elo_margin", "home_qb", "away_qb", "home_qb_adj", "away_qb_adj", "home_db_out", "home_lb_out", "away_db_out", "away_lb_out", "params_built"]
+            "margin", "total", "home_wp", "elo_wp", "elo_margin", "home_qb", "away_qb", "home_qb_adj", "away_qb_adj", "home_db_out", "home_lb_out", "away_db_out", "away_lb_out", "params_built", "model_version"]
 
 
 def kickoff_utc(gameday, gametime):
@@ -104,8 +113,8 @@ def main():
     # QBs: each one's rating before this week, the QB rating already inside each team's numbers,
     # and this week's starter (depth chart QB1 unless Out/Doubtful)
     qp = json.load(open("qb_params.json"))
-    qsums = qb.weekly_sums(pd.concat([qb.load_dropbacks(data / f"pbp_{s}.csv.gz") for s in range(season - 3, season + 1)
-                                      if (data / f"pbp_{s}.csv.gz").exists()]))
+    qsums, _ = qb.load_sums([data / f"pbp_{s}.csv.gz" for s in range(season - 3, season + 1)
+                             if (data / f"pbp_{s}.csv.gz").exists()])
     qtab = qb.ratings_as_of(qsums, season, week, qp)
     repl = qb.replacement_rating(qp)
     qbase = qb.team_baseline(tf[(tf.qb_dropback == 1) & tf.passer_id.notna()], qtab.rating, repl)
@@ -114,6 +123,7 @@ def main():
     qindex = lambda rating: 100 + 10 * (rating - qp["starter_mean"]) / qp["starter_sd"]
     qrating = lambda pid: float(qtab.rating.get(pid, repl))
     qadj = {t: qrating(starters[t]["id"]) - float(qbase.get(t, repl)) for t in r.teams if t in starters}
+    full_names = dict(zip(depth.gsis_id, depth.name))      # play-by-play only has "J.Daniels"-style names
     status = {} if report.empty else report[report.week == week].set_index("gsis_id").report_status.dropna().to_dict()
 
     elo_now = elo.ratings_through(games, season, week)
@@ -146,13 +156,13 @@ def main():
                              "home_qb_adj": round(pred["home_qb_adj"], 4), "away_qb_adj": round(pred["away_qb_adj"], 4),
                              "home_db_out": round(missing[g.home_team]["DB"], 2), "home_lb_out": round(missing[g.home_team]["LB"], 2),
                              "away_db_out": round(missing[g.away_team]["DB"], 2), "away_lb_out": round(missing[g.away_team]["LB"], 2),
-                             "params_built": params["built"]})
+                             "params_built": params["built"], "model_version": model_version()})
 
     # reindex: older logs gain any newer columns (e.g. elo_wp) as blanks
     log = (pd.read_csv(LOG) if LOG.exists() else pd.DataFrame()).reindex(columns=LOG_COLS)
     # only log a game again when its prediction changed (new injuries, new data, recalibration)
     last = log.sort_values("logged_at").groupby("game_id").tail(1).set_index("game_id") if len(log) else None
-    key = ["home_pts", "away_pts", "home_wp", "elo_wp", "params_built"]
+    key = ["home_pts", "away_pts", "home_wp", "elo_wp", "model_version"]
     new_rows = [x for x in new_rows if last is None or x["game_id"] not in last.index
                 or any(str(last.loc[x["game_id"], k]) != str(x[k]) for k in key)]
     if new_rows:
@@ -222,9 +232,9 @@ def main():
                                  "index": qindex(qrating(x.gsis_id)), "status": status.get(x.gsis_id)}
                                 for _, x in depth[depth.team == t].iterrows()]}
                 for t in r.teams if t in starters},
-        "qb_table": [{"name": n["name"], "team": n.team, "dropbacks": float(n.n), "index": float(n.qb_index), "rating": float(n.rating),
+        "qb_table": [{"name": full_names.get(pid, n["name"]), "team": n.team, "dropbacks": float(n.n), "index": float(n.qb_index), "rating": float(n.rating),
                       **{s_: float(n[f"{s_}_index"]) for s_ in qb.STATS}}
-                     for _, n in qtab[qtab.n >= 150].sort_values("rating", ascending=False).iterrows()],
+                     for pid, n in qtab[qtab.n >= 150].sort_values("rating", ascending=False).iterrows()],
         "qb_meta": {"starter_mean": qp["starter_mean"], "starter_sd": qp["starter_sd"], "replacement": repl,
                     "weights": qp["weights"], "test": qp["test"]},
         "elo": {"ratings": {t: elo_now[t] for t in r.teams}, "prev": {t: elo_prev[t] for t in r.teams},

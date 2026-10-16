@@ -34,17 +34,16 @@ from nflmodel.ratings import ALPHA, FADE_WEEKS, W_EARLY, W_PRIOR, Ratings, prior
 FIRST = 2022
 
 
-def replay(data_dir, last_season, w_prior=W_PRIOR, alpha=ALPHA, qb_beta=0.0):
+def replay(data_dir, last_season, w_prior=W_PRIOR, alpha=ALPHA, qb_beta=0.0, qb_params="qb_params.json"):
     seasons = range(FIRST - 1, last_season + 1)
     pbp = {s: D.pbp(data_dir, s) for s in seasons}
     snaps = {s: D.snaps(data_dir, s) for s in seasons}
     inj = {s: D.injuries(data_dir, s) for s in seasons}
     games = D.games(data_dir)
     if qb_beta:
-        qp = json.load(open("qb_params.json"))
-        qsums = qb.weekly_sums(pd.concat([qb.load_dropbacks(Path(data_dir) / f"pbp_{s}.csv.gz")
-                                          for s in range(FIRST - 4, last_season + 1)
-                                          if (Path(data_dir) / f"pbp_{s}.csv.gz").exists()]))
+        qp = json.load(open(qb_params))
+        qsums, _ = qb.load_sums([Path(data_dir) / f"pbp_{s}.csv.gz" for s in range(FIRST - 4, last_season + 1)
+                                 if (Path(data_dir) / f"pbp_{s}.csv.gz").exists()])
         repl = qb.replacement_rating(qp)
     rows = []
     for season in range(FIRST, last_season + 1):
@@ -109,6 +108,7 @@ def main():
     ap.add_argument("--fade-weeks", type=int, default=FADE_WEEKS, help="weeks for --w-early to fade out")
     ap.add_argument("--alpha", type=float, default=ALPHA, help="ridge shrinkage")
     ap.add_argument("--qb-beta", type=float, default=1.0, help="weight on the QB adjustment (0 = off)")
+    ap.add_argument("--qb-params", default="qb_params.json", help="QB index settings to use")
     ap.add_argument("--tag", help="experiment name: writes experiments/<tag>.json instead of params.json")
     a = ap.parse_args()
     if a.fetch:
@@ -116,7 +116,7 @@ def main():
 
     print("Replaying seasons week by week...")
     wp = a.w_prior if a.w_early is None else (lambda wk: prior_weight(wk, a.w_prior, a.w_early, a.fade_weeks))
-    bt, lev = replay(a.data_dir, a.season, wp, a.alpha, a.qb_beta)
+    bt, lev = replay(a.data_dir, a.season, wp, a.alpha, a.qb_beta, a.qb_params)
 
     # calibration (all seasons) + leave-one-season-out version for an honest scorecard
     cal = fit_calibration(bt)

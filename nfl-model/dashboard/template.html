@@ -697,14 +697,14 @@ const DATA = /*__DATA__*/null;
   // ---------- QB index ----------
   (function renderQBs() {
     const m = DATA.qb_meta;
-    $("qb-note").textContent = "Each QB's expected EPA per dropback going forward, built from EPA and success rate per dropback, shrunk toward backup level until he has enough plays, and weighted toward recent seasons. 100 is an average starter and 10 points is one standard deviation. CPOE, sack rate and interception rate are shown on the same scale for style; they added nothing to predicting future play, so they don't count toward the index. QBs with 150+ recency-weighted dropbacks.";
+    $("qb-note").textContent = "Each QB's expected value per dropback going forward. It combines the throw itself, what receivers add after the catch (credited at about three-quarters, since scheme and receivers drive much of it), success rate, and the value of designed runs. Each stat is shrunk toward backup level until the QB has enough plays, and recent seasons count more. 100 is an average starter and 10 points is one standard deviation. CPOE and sack avoidance are shown for style but don't count toward the index; interception rate is left out because it's mostly noise. QBs with 150+ recency-weighted dropbacks.";
     const t = $("qb-table");
-    const head = ["#", "QB", "Team", "QB index", "EPA", "Success", "CPOE", "Sack avoid", "INT avoid", "Dropbacks"];
+    const head = ["#", "QB", "Team", "QB index", "Throw", "After catch", "Success", "Runs", "CPOE", "Sack avoid", "Dropbacks"];
     t.appendChild(el("thead", {}, [el("tr", {}, head.map(h => el("th", { text: h })))]));
     const b = el("tbody");
     DATA.qb_table.forEach((q, i) => b.appendChild(el("tr", {}, [el("td", { class: "num", text: String(i + 1) }), el("td", { class: "strong", text: q.name }),
       el("td", { text: q.team }), el("td", { class: "num strong", text: Math.round(q.index) }),
-      ...["epa", "success", "cpoe", "sack_rate", "int_rate"].map(k => el("td", { class: "num", text: Math.round(q[k]) })),
+      ...["throw", "yac", "success", "run", "cpoe", "sack_rate"].map(k => el("td", { class: "num", text: Math.round(q[k]) })),
       el("td", { class: "num", text: Math.round(q.dropbacks) })])));
     t.appendChild(b);
   })();

@@ -39,8 +39,8 @@ built and tested on one game.
 
 | | Brier (0 = perfect, 0.25 = coin flip) | Picks winner | Margin miss |
 |---|---|---|---|
-| **Model** | **0.223** | **64.6%** | 9.9 pts |
-| Elo benchmark | 0.223 | 63.0% | — |
+| **Model** | **0.2225** | **64.7%** | 9.9 pts |
+| Elo benchmark | 0.2232 | 63.0% | — |
 | Always pick the home team | 0.248 | 55% | 10.8 pts |
 
 Each season is scored with calibration fit on the other seasons, so the scorecard isn't grading
@@ -49,27 +49,33 @@ its own answers. Every change and its test result is in [experiments/README.md](
 ## The QB index (`qb_index.py`)
 
 1. **Stability.** Each QB-season split into odd and even dropbacks: a stat that agrees with itself
-   is skill. EPA is half signal after ~250 dropbacks, success rate ~185, CPOE ~355 attempts,
-   sack rate ~330, interception rate ~4,300 (mostly noise).
+   is skill. Success rate is half signal after ~185 dropbacks, EPA ~250, CPOE ~355 attempts, sack
+   rate ~330, designed-run value ~680 (split by games), interception rate ~4,300 (mostly noise).
 2. **Shrinking.** Each stat is pulled toward **replacement level** (backup production) by that
    amount, so a QB with little history starts as a backup, not as an average starter.
 3. **Recency.** This season counts fully; each season back counts 0.6 as much (chosen on 2023).
-4. **Composite.** A regression on 2019–23 predicted each QB's EPA per dropback in a game from his
-   stats before it. EPA + success rate did best on 2024–26 (6.4% better than "everyone is
-   average"). CPOE, sack rate and interception rate overlap with them and added nothing, so they're
-   shown for style but carry no weight.
+4. **Composite.** EPA is split into the **throw** and what receivers add **after the catch (YAC)**.
+   A regression on 2019–26 credits YAC at ~75% of throw value per point, alongside success rate.
+   **Designed runs** are added at face value. CPOE and sack rate are shown for style but add
+   nothing; interception rate is noise.
 5. **Scale.** The index is 100 for an average starter, 10 points per standard deviation.
 
+**Checked against the real world:** the index and ESPN QBR rank QBs similarly (rank correlation
+0.79). The remaining gaps are mostly intentional. QBR reflects recent games and doesn't shrink
+small samples, so young QBs and backups rank higher there. And EPA-based measures still favor QBs in
+strong schemes (Purdy, Goff), because public data can't fully separate a QB from his receivers and
+play-caller. `outputs/qb_ratings.csv` has the current ratings.
+
 Open data behind it: nflverse play-by-play (every dropback since 1999, CPOE since 2006) and daily
-depth charts. Next Gen Stats (2016+) and PFR pressure and bad-throw data (2018+) are also openly
-available and are candidates for future tests.
+depth charts. Next Gen Stats (2016+), PFR pressure and bad-throw data (2018+) and ESPN QBR (2006+)
+are also openly available.
 
 ## The Elo benchmark
 
 Every game is also predicted by Elo (`nflmodel/elo.py`): one rating per team, updated from
 final scores, with settings frozen at the values tuned on 2002–2021 in
-[elo-model](../elo-model/). It's the bar Gridiron has to clear, and right now it's ahead
-(replay Brier 0.223 vs 0.228). Both models are logged before every kickoff and graded on the
+[elo-model](../elo-model/). It's the bar Gridiron has to clear. After the QB work the two are level
+(replay Brier 0.2225 vs 0.2232, a statistical tie). Both models are logged before every kickoff and graded on the
 same games, so the Record tab shows the live head-to-head.
 
 The Ratings tab groups teams into five **Elo tiers**, using fixed lines on the chance of
@@ -133,8 +139,9 @@ python3 compare.py my_test             # judge it against the current model and 
 
 ## Next improvements to test
 
-- **More QB inputs** from Next Gen Stats and PFR (pressure-adjusted stats, bad-throw rate), tested
-  against the current index.
+- **QB index, next candidates:** adjust for opponent defenses faced; use PFR pressure data so sacks
+  behind a bad line count less against the QB; a draft-position prior for rookies (who all start at
+  backup level today); and separating QB from scheme using QBs who changed teams.
 - **A weather forecast source** for totals. Wind showed a real but small pattern; it needs
   forecasts to be usable before kickoff.
 - **Within-season recency.** Weight recent weeks more than September.

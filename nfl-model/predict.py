@@ -54,8 +54,8 @@ def main():
 
     # QB adjustment: starter's rating minus the QB rating already inside the team's numbers
     qp = json.load(open("qb_params.json"))
-    qsums = qb.weekly_sums(pd.concat([qb.load_dropbacks(f"{a.data_dir}/pbp_{s}.csv.gz") for s in range(a.season - 3, a.season + 1)
-                                      if os.path.exists(f"{a.data_dir}/pbp_{s}.csv.gz")]))
+    qsums, _ = qb.load_sums([f"{a.data_dir}/pbp_{s}.csv.gz" for s in range(a.season - 3, a.season + 1)
+                             if os.path.exists(f"{a.data_dir}/pbp_{s}.csv.gz")])
     qtab, repl = qb.ratings_as_of(qsums, a.season, week, qp), qb.replacement_rating(qp)
     base = qb.team_baseline(tf[(tf.qb_dropback == 1) & tf.passer_id.notna()], qtab.rating, repl)
     depth = D.depth_qbs(a.data_dir, a.season)
