@@ -11,13 +11,14 @@ K, HFA, REVERT = 20, 55, 0.5          # reaction speed, home field (Elo pts), of
 POINTS_PER_ELO = 1 / 25
 RELOCATED = {"OAK": "LV", "SD": "LAC", "STL": "LA"}
 
-# Tiers: fixed lines on "chance to beat an average team on a neutral field".
-# Football field position, from the opponent's goal line back to your own.
+# Tiers: fixed lines on "chance to beat an average team on a neutral field", highest first.
+# Fixed lines keep each name meaning the same thing all season; tier sizes move with the league.
 TIERS = [  # (name, medal, minimum Elo above average, what it means)
-    ("Red Zone", "gold", 100, "beats an average team 64%+ of the time"),
-    ("Field Goal Range", "silver", 35, "beats an average team 55–64%"),
-    ("Midfield", "bronze", -35, "a coin flip against an average team (45–55%)"),
-    ("Backed Up", None, -10_000, "loses to an average team more often than not"),
+    ("Dynasty", "gold", 110, "beats an average team 65%+ of the time"),
+    ("Powerhouse", "silver", 50, "beats an average team 57–65%"),
+    ("Contender", "bronze", -50, "within a few points of average (43–57%)"),
+    ("Challenger", None, -110, "beats an average team 35–43%"),
+    ("Underdog", None, -10_000, "beats an average team under 35%"),
 ]
 
 

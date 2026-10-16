@@ -80,21 +80,20 @@ main { padding-block: 24px 64px; }
 .final { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
 .elo-line { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
 .elo-line b { color: var(--ink-2); font-weight: 600; }
-.tiers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
 .tier { background: var(--surface); border: 1px solid var(--rule); border-top: 4px solid var(--rule); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .tier[data-medal="gold"] { border-top-color: var(--gold); }
 .tier[data-medal="silver"] { border-top-color: var(--silver); }
 .tier[data-medal="bronze"] { border-top-color: var(--bronze); }
 .tier h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.tier .medal { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.tier .medal { white-space: nowrap; font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
 .tier ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .tier li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
 .tier li .t { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.04em; }
 .tier li .r { font-family: var(--mono); font-size: 13px; color: var(--ink-2); }
 .tier li .d { font-family: var(--mono); font-size: 12px; color: var(--ink-3); text-align: right; }
 .tier li .d.up { color: var(--good); }
-@media (max-width: 860px) { .tiers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 420px) { .tiers { grid-template-columns: 1fr; } }
+
 .final b { color: var(--ink); }
 
 /* Matchup */
@@ -238,7 +237,7 @@ td.strong, td:first-child { color: var(--ink); font-weight: 500; }
   <section class="panel" id="p-ratings" role="tabpanel" aria-labelledby="tab-ratings" hidden>
     <div class="section">
       <h2>Elo tiers</h2>
-      <p class="muted">The Elo benchmark, grouped by field position. Each line is a fixed chance of beating an average team on a neutral field, so a tier holds as many teams as have earned it. The arrow is the change since last week.</p>
+      <p class="muted">The Elo benchmark, grouped by strength. Each line is a fixed chance of beating an average team on a neutral field, so a tier holds as many teams as have earned it. Numbers are Elo points above the league average; the arrow is the change since last week.</p>
       <div class="tiers" id="tiers"></div>
     </div>
     <div class="section">
@@ -605,12 +604,12 @@ const DATA = /*__DATA__*/null;
       const lo = tr.floor, hi = i === 0 ? Infinity : E.tiers[i - 1].floor;
       const members = teams.filter(x => x.r >= lo && x.r < hi);
       const card = el("div", { class: "tier", "data-medal": tr.medal || "none" });
-      card.appendChild(el("h3", {}, [tr.name, el("span", { class: "medal", text: (tr.medal || "unranked") + " · " + members.length })]));
+      card.appendChild(el("h3", {}, [tr.name, el("span", { class: "medal", text: members.length + (members.length === 1 ? " team" : " teams") })]));
       card.appendChild(el("p", { class: "small", text: tr.means }));
       const ol = el("ol");
       members.forEach(x => {
         const arrow = Math.abs(x.d) < 0.5 ? "–" : (x.d > 0 ? "▲ " : "▼ ") + Math.abs(x.d).toFixed(0);
-        ol.appendChild(el("li", {}, [el("span", { class: "t", text: x.t }), el("span", { class: "r", text: (x.r >= 0 ? "+" : "−") + Math.abs(x.r).toFixed(0) + " Elo" }),
+        ol.appendChild(el("li", {}, [el("span", { class: "t", text: x.t }), el("span", { class: "r", text: (x.r >= 0 ? "+" : "−") + Math.abs(x.r).toFixed(0) }),
           el("span", { class: "d" + (x.d >= 0.5 ? " up" : ""), text: arrow, "aria-label": "change since last week " + x.d.toFixed(0) })]));
       });
       if (!members.length) ol.appendChild(el("li", {}, [el("span", { class: "r", text: "No teams this week" })]));

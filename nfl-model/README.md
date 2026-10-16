@@ -50,18 +50,20 @@ final scores, with settings frozen at the values tuned on 2002–2021 in
 (replay Brier 0.223 vs 0.228). Both models are logged before every kickoff and graded on the
 same games, so the Record tab shows the live head-to-head.
 
-The Ratings tab groups teams into **Elo tiers** by field position, using fixed lines on the
-chance of beating an average team on a neutral field:
+The Ratings tab groups teams into five **Elo tiers**, using fixed lines on the chance of
+beating an average team on a neutral field:
 
-| Tier | Medal | Elo vs average | Beats an average team |
-|---|---|---|---|
-| Red Zone | gold | +100 or more | 64%+ |
-| Field Goal Range | silver | +35 to +100 | 55–64% |
-| Midfield | bronze | −35 to +35 | 45–55% |
-| Backed Up | — | below −35 | under 45% |
+| Tier | Elo vs average | Beats an average team |
+|---|---|---|
+| Dynasty | +110 or more | 65%+ |
+| Powerhouse | +50 to +110 | 57–65% |
+| Contender | −50 to +50 | 43–57% |
+| Challenger | −110 to −50 | 35–43% |
+| Underdog | below −110 | under 35% |
 
-Fixed lines mean tier sizes change with the league: a season with three great teams has three
-teams in the Red Zone, not a fixed eight.
+Fixed lines mean tier sizes change with the league. Averaged over the 2010–2025 season ends,
+the tiers held 6.1 / 4.3 / 11.1 / 5.1 / 5.3 teams. Ratings spread out as a season goes on, so
+early-season tiers are more crowded in the middle.
 
 ## The rules this model follows
 
