@@ -20,14 +20,14 @@ import numpy as np
 import pandas as pd
 
 from nflmodel import data as D
-from nflmodel import elo
+from nflmodel import elo, qb
 from nflmodel.engine import K, SCENARIOS, Model
 from nflmodel.injuries import EFFECTS, team_missing
 from nflmodel.ratings import Ratings, training_frame
 
 LOG = Path("forecast_log.csv")
 LOG_COLS = ["game_id", "season", "week", "home", "away", "logged_at", "kickoff", "home_pts", "away_pts",
-            "margin", "total", "home_wp", "elo_wp", "elo_margin", "home_db_out", "home_lb_out", "away_db_out", "away_lb_out", "params_built"]
+            "margin", "total", "home_wp", "elo_wp", "elo_margin", "home_qb", "away_qb", "home_qb_adj", "away_qb_adj", "home_db_out", "home_lb_out", "away_db_out", "away_lb_out", "params_built"]
 
 
 def kickoff_utc(gameday, gametime):
@@ -87,18 +87,34 @@ def main():
     a = ap.parse_args()
     season, data = a.season, Path(a.data_dir)
     if not a.no_fetch:
-        D.fetch(data, [season - 1, season], current=season)
+        D.fetch(data, range(season - 3, season + 1), current=season)   # QB ratings use 3 seasons back
 
     games = D.games(data)
     sched = games[(games.season == season) & (games.game_type == "REG")].copy()
     week = a.week or int(sched[sched.result.isna()].week.min())
     params = json.load(open("params.json"))
     pbp = {s: D.pbp(data, s) for s in (season - 1, season)}
-    r = Ratings(training_frame(pbp, season, week))
+    tf = training_frame(pbp, season, week)
+    r = Ratings(tf)
     model = Model(r, params)
     snaps_cur, snaps_prior = D.snaps(data, season), D.snaps(data, season - 1)
     report = D.injuries(data, season)
     missing = {t: team_missing(snaps_cur, snaps_prior, report, week, t) for t in r.teams}
+
+    # QBs: each one's rating before this week, the QB rating already inside each team's numbers,
+    # and this week's starter (depth chart QB1 unless Out/Doubtful)
+    qp = json.load(open("qb_params.json"))
+    qsums = qb.weekly_sums(pd.concat([qb.load_dropbacks(data / f"pbp_{s}.csv.gz") for s in range(season - 3, season + 1)
+                                      if (data / f"pbp_{s}.csv.gz").exists()]))
+    qtab = qb.ratings_as_of(qsums, season, week, qp)
+    repl = qb.replacement_rating(qp)
+    qbase = qb.team_baseline(tf[(tf.qb_dropback == 1) & tf.passer_id.notna()], qtab.rating, repl)
+    depth = D.depth_qbs(data, season)
+    starters = qb.live_starters(depth, report, week)
+    qindex = lambda rating: 100 + 10 * (rating - qp["starter_mean"]) / qp["starter_sd"]
+    qrating = lambda pid: float(qtab.rating.get(pid, repl))
+    qadj = {t: qrating(starters[t]["id"]) - float(qbase.get(t, repl)) for t in r.teams if t in starters}
+    status = {} if report.empty else report[report.week == week].set_index("gsis_id").report_status.dropna().to_dict()
 
     elo_now = elo.ratings_through(games, season, week)
     elo_prev = elo.ratings_through(games, season, week - 1) if week > 1 else elo_now
@@ -107,7 +123,12 @@ def main():
     slate, new_rows = [], []
     for g in sched[sched.week == week].sort_values(["gameday", "gametime"]).itertuples():
         pred = model.predict(g.home_team, g.away_team, g.location == "Neutral",
-                             missing[g.home_team], missing[g.away_team])
+                             missing[g.home_team], missing[g.away_team],
+                             qadj.get(g.home_team, 0.0), qadj.get(g.away_team, 0.0))
+        for side, team in (("home", g.home_team), ("away", g.away_team)):
+            st = starters.get(team, {"id": None, "name": "unknown", "replaces": None})
+            pred |= {f"{side}_qb": st["name"], f"{side}_qb_index": qindex(qrating(st["id"])),
+                     f"{side}_qb_replaces": st["replaces"], f"{side}_qb_adj": qadj.get(team, 0.0)}
         pred |= elo.predict(elo_now, g.home_team, g.away_team, g.location == "Neutral")
         ko = kickoff_utc(g.gameday, g.gametime)
         slate.append({**pred, "game_id": g.game_id, "gameday": g.gameday, "gametime": g.gametime,
@@ -121,6 +142,8 @@ def main():
                              "away_pts": round(pred["away_pts"], 2), "margin": round(pred["margin"], 2),
                              "total": round(pred["total"], 2), "home_wp": round(pred["home_wp"], 4),
                              "elo_wp": round(pred["elo_wp"], 4), "elo_margin": round(pred["elo_margin"], 2),
+                             "home_qb": pred["home_qb"], "away_qb": pred["away_qb"],
+                             "home_qb_adj": round(pred["home_qb_adj"], 4), "away_qb_adj": round(pred["away_qb_adj"], 4),
                              "home_db_out": round(missing[g.home_team]["DB"], 2), "home_lb_out": round(missing[g.home_team]["LB"], 2),
                              "away_db_out": round(missing[g.away_team]["DB"], 2), "away_lb_out": round(missing[g.away_team]["LB"], 2),
                              "params_built": params["built"]})
@@ -142,6 +165,7 @@ def main():
         fav, wp = (s["home"], s["home_wp"]) if s["home_wp"] >= 0.5 else (s["away"], 1 - s["home_wp"])
         print(f"  {s['away']:>3} {s['away_pts']:4.1f} @ {s['home']:<3} {s['home_pts']:4.1f}   {fav} {wp:.0%}"
               f"   (Elo: {s['home'] if s['elo_wp'] >= 0.5 else s['away']} {max(s['elo_wp'], 1 - s['elo_wp']):.0%})"
+              f"   QBs {s['away_qb']} {s['away_qb_index']:.0f} / {s['home_qb']} {s['home_qb_index']:.0f}"
               + (f"   final {s['away_score']}-{s['home_score']}" if s["played"] else ""))
     if summary:
         print(f"Season record: {summary['games']} games, picked winner {summary['winner_pct']:.0%}, "
@@ -193,6 +217,16 @@ def main():
                    .sort_values(["week", "game_id"], ascending=[False, True]).to_dict("records"),
                    "reconstructed": reconstructed},
         "backtest": params["scorecard"],
+        "qbs": {t: {"baseline": float(qbase.get(t, repl)), "starter": starters[t]["id"],
+                    "options": [{"id": x.gsis_id, "name": x["name"], "rank": int(x["rank"]), "rating": qrating(x.gsis_id),
+                                 "index": qindex(qrating(x.gsis_id)), "status": status.get(x.gsis_id)}
+                                for _, x in depth[depth.team == t].iterrows()]}
+                for t in r.teams if t in starters},
+        "qb_table": [{"name": n["name"], "team": n.team, "dropbacks": float(n.n), "index": float(n.qb_index), "rating": float(n.rating),
+                      **{s_: float(n[f"{s_}_index"]) for s_ in qb.STATS}}
+                     for _, n in qtab[qtab.n >= 150].sort_values("rating", ascending=False).iterrows()],
+        "qb_meta": {"starter_mean": qp["starter_mean"], "starter_sd": qp["starter_sd"], "replacement": repl,
+                    "weights": qp["weights"], "test": qp["test"]},
         "elo": {"ratings": {t: elo_now[t] for t in r.teams}, "prev": {t: elo_prev[t] for t in r.teams},
                 "hfa": elo.HFA, "tiers": [{"name": n, "medal": m, "floor": f, "means": d} for n, m, f, d in elo.TIERS],
                 "backtest": elo_backtest},

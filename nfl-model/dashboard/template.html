@@ -79,6 +79,9 @@ main { padding-block: 24px 64px; }
 .split i { display: block; height: 100%; }
 .final { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
 .elo-line { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+.qb-line { font-size: 12px; color: var(--ink-3); display: flex; justify-content: space-between; gap: 8px; }
+.qb-line b { color: var(--ink-2); font-weight: 600; }
+.inj select { max-width: 100%; }
 .elo-line b { color: var(--ink-2); font-weight: 600; }
 .tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
 .tier { background: var(--surface); border: 1px solid var(--rule); border-top: 4px solid var(--rule); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
@@ -136,7 +139,7 @@ input[type="number"] { width: 84px; }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; font-variant-numeric: tabular-nums; }
 th:first-child, td:first-child { text-align: left; }
-#ratings th:nth-child(2), #ratings td:nth-child(2) { text-align: left; }
+#ratings th:nth-child(2), #ratings td:nth-child(2), #qb-table th:nth-child(2), #qb-table td:nth-child(2), #qb-table th:nth-child(3), #qb-table td:nth-child(3) { text-align: left; }
 th { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
 th button { all: unset; cursor: pointer; }
 th button[aria-sort]::after { content: " ↓"; }
@@ -251,6 +254,11 @@ td.strong, td:first-child { color: var(--ink); font-weight: 500; }
       <div class="tiers" id="tiers"></div>
     </div>
     <div class="section">
+      <h2>QB index</h2>
+      <p class="muted" id="qb-note"></p>
+      <div class="tw"><table id="qb-table"></table></div>
+    </div>
+    <div class="section">
       <h2>Team ratings</h2>
       <p class="muted">Opponent-adjusted EPA per play against an average team; positive is good on both sides of the ball. Net is the predicted margin against an average team on a neutral field.</p>
       <div class="tw"><table id="ratings"></table></div>
@@ -307,9 +315,18 @@ const DATA = /*__DATA__*/null;
     K.forEach((k, i) => { if (k > 0) w += p[i]; else if (k === 0) w += p[i] / 2; });
     return w;
   }
-  function predict(home, away, neutral, hm, am) {
+  // QB adjustment: chosen starter's rating minus the QB rating already inside the team's numbers
+  const Q = DATA.qbs || {};
+  function qbAdj(team, qbId) {
+    const t = Q[team];
+    if (!t) return 0;
+    const o = t.options.find(x => x.id === qbId);
+    return (o ? o.rating : DATA.qb_meta.replacement) - t.baseline;
+  }
+  function predict(home, away, neutral, hm, am, hq, aq) {
     const h = neutral ? 0 : 0.5, c = P.calibration;
-    const rh = points(home, away, h, offAdj(am)), ra = points(away, home, -h, offAdj(hm));
+    const ha = offAdj(am), aa = offAdj(hm);
+    const rh = points(home, away, h, [ha[0] + (hq || 0), ha[1]]), ra = points(away, home, -h, [aa[0] + (aq || 0), aa[1]]);
     const m = c.m_home * (neutral ? 0 : 1) + c.m_slope * (rh - ra);
     const t = c.t_icpt + c.t_slope * (rh + ra);
     return { m, t, hp: (t + m) / 2, ap: (t - m) / 2, wp: winProb(m), p: pmf(m) };
@@ -378,6 +395,9 @@ const DATA = /*__DATA__*/null;
         el("i", { style: "width:" + ((1 - g.home_wp) * 100).toFixed(1) + "%;background:var(--away)" }),
         el("i", { style: "width:" + (g.home_wp * 100).toFixed(1) + "%;background:var(--home)" })])
     ]);
+    card.appendChild(el("div", { class: "qb-line" }, [
+      el("span", {}, [el("b", { text: g.away_qb }), " " + Math.round(g.away_qb_index)]),
+      el("span", {}, [el("b", { text: g.home_qb }), " " + Math.round(g.home_qb_index)])]));
     const ep = g.elo_wp, eFav = ep >= 0.5 ? g.home : g.away;
     card.appendChild(el("div", { class: "elo-line" }, ["Elo benchmark: ", el("b", { text: eFav + " " + pct(Math.max(ep, 1 - ep)) })]));
     if (g.played) card.appendChild(el("div", { class: "final" }, ["Final: ", el("b", { text: g.away + " " + g.away_score + ", " + g.home + " " + g.home_score })]));
@@ -387,7 +407,7 @@ const DATA = /*__DATA__*/null;
 
   // ---------- matchup ----------
   const $ = id => document.getElementById(id);
-  const state = { home: null, away: null, neutral: false, miss: {} };
+  const state = { home: null, away: null, neutral: false, miss: {}, qb: {} };
   ["home", "away"].forEach(s => TEAMS.forEach(t => $(s).appendChild(el("option", { value: t, text: t }))));
   $("pick").appendChild(el("option", { value: "", text: "Pick a scheduled game…" }));
   let wk = null, grp = null;
@@ -402,6 +422,7 @@ const DATA = /*__DATA__*/null;
   function setMatch(home, away, neutral) {
     state.home = home; state.away = away; state.neutral = !!neutral;
     state.miss = { [home]: reportMiss(home), [away]: reportMiss(away) };
+    state.qb = { [home]: Q[home] ? Q[home].starter : null, [away]: Q[away] ? Q[away].starter : null };
     $("home").value = home; $("away").value = away; $("neutral").checked = state.neutral;
     renderInjuries(); renderMatch();
   }
@@ -414,6 +435,14 @@ const DATA = /*__DATA__*/null;
     [["away", state.away], ["home", state.home]].forEach(([side, team]) => {
       const box = $("inj-" + side); box.textContent = "";
       const m = state.miss[team];
+      if (Q[team]) {
+        const id = "qb-" + side, sel = el("select", { id: id });
+        Q[team].options.forEach(o => sel.appendChild(el("option", { value: o.id,
+          text: o.name + " · QB" + o.rank + " · index " + Math.round(o.index) + (o.status ? " · " + o.status : "") })));
+        sel.value = state.qb[team];
+        sel.addEventListener("change", () => { state.qb[team] = sel.value; renderMatch(); });
+        box.appendChild(el("div", { class: "field" }, [el("label", { for: id, text: team + " starting QB" }), sel]));
+      }
       box.appendChild(el("div", { class: "eyebrow", text: team + " starters missing" }));
       const inputs = el("div", { class: "inputs" });
       [["DB", "Defensive backs"], ["LB", "Linebackers"]].forEach(([g, name]) => {
@@ -425,15 +454,15 @@ const DATA = /*__DATA__*/null;
       box.appendChild(inputs);
       const who = m.players.length ? m.players.map(p => p.name + " (" + p.status + ")").join(", ") : "No starters on this week's report.";
       box.appendChild(el("p", { class: "small", text: who }));
-      const reset = el("button", { class: "linkbtn", type: "button", text: "Reset to injury report" });
-      reset.addEventListener("click", () => { state.miss[team] = reportMiss(team); renderInjuries(); renderMatch(); });
+      const reset = el("button", { class: "linkbtn", type: "button", text: "Reset to this week's report" });
+      reset.addEventListener("click", () => { state.miss[team] = reportMiss(team); state.qb[team] = Q[team] ? Q[team].starter : null; renderInjuries(); renderMatch(); });
       box.appendChild(reset);
     });
   }
 
   function renderMatch() {
     const { home, away, neutral } = state;
-    const r = predict(home, away, neutral, state.miss[home], state.miss[away]);
+    const r = predict(home, away, neutral, state.miss[home], state.miss[away], qbAdj(home, state.qb[home]), qbAdj(away, state.qb[away]));
     const board = $("board"); board.textContent = "";
     board.setAttribute("aria-label", "Projected score: " + away + " " + r.ap.toFixed(1) + ", " + home + " " + r.hp.toFixed(1));
     board.append(
@@ -665,6 +694,21 @@ const DATA = /*__DATA__*/null;
     });
   })();
 
+  // ---------- QB index ----------
+  (function renderQBs() {
+    const m = DATA.qb_meta;
+    $("qb-note").textContent = "Each QB's expected EPA per dropback going forward, built from EPA and success rate per dropback, shrunk toward backup level until he has enough plays, and weighted toward recent seasons. 100 is an average starter and 10 points is one standard deviation. CPOE, sack rate and interception rate are shown on the same scale for style; they added nothing to predicting future play, so they don't count toward the index. QBs with 150+ recency-weighted dropbacks.";
+    const t = $("qb-table");
+    const head = ["#", "QB", "Team", "QB index", "EPA", "Success", "CPOE", "Sack avoid", "INT avoid", "Dropbacks"];
+    t.appendChild(el("thead", {}, [el("tr", {}, head.map(h => el("th", { text: h })))]));
+    const b = el("tbody");
+    DATA.qb_table.forEach((q, i) => b.appendChild(el("tr", {}, [el("td", { class: "num", text: String(i + 1) }), el("td", { class: "strong", text: q.name }),
+      el("td", { text: q.team }), el("td", { class: "num strong", text: Math.round(q.index) }),
+      ...["epa", "success", "cpoe", "sack_rate", "int_rate"].map(k => el("td", { class: "num", text: Math.round(q[k]) })),
+      el("td", { class: "num", text: Math.round(q.dropbacks) })])));
+    t.appendChild(b);
+  })();
+
   // ---------- ratings ----------
   const avgPace = TEAMS.reduce((a, t) => a + T[t].pace, 0) / TEAMS.length;
   const avgPr = TEAMS.reduce((a, t) => a + T[t].pass_rate, 0) / TEAMS.length;
@@ -697,7 +741,9 @@ const DATA = /*__DATA__*/null;
   // ---------- self-check: the page's math must match the Python engine ----------
   let worst = 0;
   DATA.slate.forEach(g => {
-    const r = predict(g.home, g.away, g.neutral, DATA.missing[g.home], DATA.missing[g.away]);
+    const r = predict(g.home, g.away, g.neutral, DATA.missing[g.home], DATA.missing[g.away], g.home_qb_adj, g.away_qb_adj);
+    const r2 = predict(g.home, g.away, g.neutral, DATA.missing[g.home], DATA.missing[g.away], qbAdj(g.home, Q[g.home] && Q[g.home].starter), qbAdj(g.away, Q[g.away] && Q[g.away].starter));
+    worst = Math.max(worst, Math.abs(r2.hp - g.home_pts), Math.abs(r2.ap - g.away_pts));
     worst = Math.max(worst, Math.abs(r.hp - g.home_pts), Math.abs(r.ap - g.away_pts), Math.abs(r.wp - g.home_wp) * 100);
   });
   window.__selfcheck = worst;

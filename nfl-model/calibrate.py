@@ -26,33 +26,52 @@ import numpy as np
 import pandas as pd
 
 from nflmodel import data as D
+from nflmodel import qb
 from nflmodel.engine import GOOD_HIGH, K, LEVERS, SCENARIOS, key_weights, normal_pmf
 from nflmodel.injuries import team_missing, offense_adj
-from nflmodel.ratings import ALPHA, W_PRIOR, Ratings, training_frame
+from nflmodel.ratings import ALPHA, FADE_WEEKS, W_EARLY, W_PRIOR, Ratings, prior_weight, training_frame
 
 FIRST = 2022
 
 
-def replay(data_dir, last_season):
+def replay(data_dir, last_season, w_prior=W_PRIOR, alpha=ALPHA, qb_beta=0.0):
     seasons = range(FIRST - 1, last_season + 1)
     pbp = {s: D.pbp(data_dir, s) for s in seasons}
     snaps = {s: D.snaps(data_dir, s) for s in seasons}
     inj = {s: D.injuries(data_dir, s) for s in seasons}
     games = D.games(data_dir)
+    if qb_beta:
+        qp = json.load(open("qb_params.json"))
+        qsums = qb.weekly_sums(pd.concat([qb.load_dropbacks(Path(data_dir) / f"pbp_{s}.csv.gz")
+                                          for s in range(FIRST - 4, last_season + 1)
+                                          if (Path(data_dir) / f"pbp_{s}.csv.gz").exists()]))
+        repl = qb.replacement_rating(qp)
     rows = []
     for season in range(FIRST, last_season + 1):
         sg = games[(games.season == season) & (games.game_type == "REG") & games.result.notna()]
         for week in sorted(sg.week.unique()):
-            r = Ratings(training_frame(pbp, season, week), ALPHA)
+            tf = training_frame(pbp, season, week, w_prior)
+            r = Ratings(tf, alpha)
+            qdelta = {}
+            if qb_beta:
+                # starter's rating minus the QB rating already inside the team's numbers
+                qr = qb.ratings_as_of(qsums, season, week, qp).rating
+                base = qb.team_baseline(tf[(tf.qb_dropback == 1) & tf.passer_id.notna()], qr, repl)
+                cur = pbp[season][(pbp[season].week == week) & (pbp[season].qb_dropback == 1) & pbp[season].passer_id.notna()]
+                for (gid, team), pid in qb.team_starters(cur).items():
+                    qdelta[(gid, team)] = qr.get(pid, repl) - base.get(team, repl)
             for g in sg[sg.week == week].itertuples():
                 if g.home_team not in r.tix or g.away_team not in r.tix:
                     continue
                 hm = team_missing(snaps[season], snaps[season - 1], inj[season], week, g.home_team)
                 am = team_missing(snaps[season], snaps[season - 1], inj[season], week, g.away_team)
+                hadj, aadj = offense_adj(am), offense_adj(hm)
+                hq, aq = qdelta.get((g.game_id, g.home_team), 0.0), qdelta.get((g.game_id, g.away_team), 0.0)
                 rh, ra = r.raw_scores(g.home_team, g.away_team, g.location == "Neutral",
-                                      offense_adj(am), offense_adj(hm))
+                                      (hadj[0] + qb_beta * hq, hadj[1]), (aadj[0] + qb_beta * aq, aadj[1]))
                 rows.append({"game_id": g.game_id, "season": season, "week": week, "home": g.home_team,
-                             "away": g.away_team, "neutral": int(g.location == "Neutral"), "raw_home": rh, "raw_away": ra,
+                             "away": g.away_team, "neutral": int(g.location == "Neutral"), "home_qb_delta": hq, "away_qb_delta": aq,
+                             "raw_home": rh, "raw_away": ra,
                              "home_score": g.home_score, "away_score": g.away_score})
         print(f"  replayed {season}", flush=True)
     bt = pd.DataFrame(rows)
@@ -85,12 +104,19 @@ def main():
     ap.add_argument("--data-dir", default="data")
     ap.add_argument("--season", type=int, default=date.today().year if date.today().month >= 9 else date.today().year - 1)
     ap.add_argument("--fetch", action="store_true", help="download missing seasons first")
+    ap.add_argument("--w-prior", type=float, default=W_PRIOR, help="weight on last season's plays")
+    ap.add_argument("--w-early", type=float, default=W_EARLY, help="Week 1 weight on last season, fading to --w-prior")
+    ap.add_argument("--fade-weeks", type=int, default=FADE_WEEKS, help="weeks for --w-early to fade out")
+    ap.add_argument("--alpha", type=float, default=ALPHA, help="ridge shrinkage")
+    ap.add_argument("--qb-beta", type=float, default=1.0, help="weight on the QB adjustment (0 = off)")
+    ap.add_argument("--tag", help="experiment name: writes experiments/<tag>.json instead of params.json")
     a = ap.parse_args()
     if a.fetch:
         D.fetch(a.data_dir, range(FIRST - 1, a.season + 1), current=a.season)
 
     print("Replaying seasons week by week...")
-    bt, lev = replay(a.data_dir, a.season)
+    wp = a.w_prior if a.w_early is None else (lambda wk: prior_weight(wk, a.w_prior, a.w_early, a.fade_weeks))
+    bt, lev = replay(a.data_dir, a.season, wp, a.alpha, a.qb_beta)
 
     # calibration (all seasons) + leave-one-season-out version for an honest scorecard
     cal = fit_calibration(bt)
@@ -154,13 +180,15 @@ def main():
                                   "mae_margin": float((d.result - d.cv_m).abs().mean())}
                          for s, d in bt.groupby("season")}
 
-    params = {"built": str(date.today()), "seasons": f"{FIRST}-{a.season}", "w_prior": W_PRIOR, "alpha": ALPHA,
+    params = {"built": str(date.today()), "seasons": f"{FIRST}-{a.season}", "w_prior": a.w_prior, "w_early": a.w_early, "fade_weeks": a.fade_weeks, "alpha": a.alpha, "qb_beta": a.qb_beta,
               "calibration": cal, "sd_margin": sd_m, "sd_total": sd_t, "key_weights": w.round(4).tolist(),
               "lever_coef": coef, "lever_means": means.to_dict(), "sd_margin_given_levers": sd_m_levers,
               "scenario_freq": freq, "scorecard": card}
-    with open("params.json", "w") as f:
+    out = Path(f"experiments/{a.tag}.json") if a.tag else Path("params.json")
+    out.parent.mkdir(exist_ok=True)
+    with open(out, "w") as f:
         json.dump(params, f, indent=1)
-    bt.to_csv("outputs/replay_games.csv", index=False)
+    bt.to_csv(f"experiments/{a.tag}_games.csv" if a.tag else "outputs/replay_games.csv", index=False)
 
     print(f"\n{len(bt)} games replayed. Calibration: margin = {cal['m_home']:+.2f} (if home) + {cal['m_slope']:.2f} x raw, "
           f"total = {cal['t_icpt']:+.1f} + {cal['t_slope']:.2f} x raw")

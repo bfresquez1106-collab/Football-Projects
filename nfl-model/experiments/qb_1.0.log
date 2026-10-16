@@ -1,0 +1,17 @@
+Replaying seasons week by week...
+  replayed 2022
+  replayed 2023
+  replayed 2024
+  replayed 2025
+  replayed 2026
+
+1167 games replayed. Calibration: margin = +2.62 (if home) + 0.82 x raw, total = +20.0 + 0.55 x raw
+Margin SD 12.8 (given levers 9.0), total SD 13.4
+Scorecard (season-out calibration):
+  model        brier 0.225  log_loss 0.641  mae_margin 9.945  mae_total 10.553  winner_pct 0.643
+  raw_model    brier 0.230  log_loss 0.653  mae_margin 10.154  mae_total 10.748  winner_pct 0.627
+  always_home  brier 0.248  log_loss 0.689  mae_margin 10.793  mae_total 10.837  winner_pct 0.546
+Calibration: [('(0.0, 0.2]', 8, 0.16, 0.12), ('(0.2, 0.35]', 107, 0.3, 0.35), ('(0.35, 0.5]', 318, 0.44, 0.38), ('(0.5, 0.65]', 456, 0.57, 0.59), ('(0.65, 0.8]', 238, 0.71, 0.73), ('(0.8, 1.0]', 40, 0.84, 0.8)]
+By season: {2022: (271, 0.225, 9.0), 2023: (272, 0.233, 10.5), 2024: (272, 0.216, 10.2), 2025: (272, 0.225, 10.1), 2026: (80, 0.232, 9.8)}
+Lever points: {'takeaways': np.float64(1.78), 'giveaways': np.float64(-1.55), 'sacks_made': np.float64(0.2), 'sacks_taken': np.float64(-0.9), 'expl_for': np.float64(1.47), 'expl_against': np.float64(0.21)}
+Scenario frequency: {'Clean offense': 0.131, 'Win turnovers by +2': 0.128, 'Defense takes over': 0.022, 'Explosive night': 0.012, 'Great night': 0.009}

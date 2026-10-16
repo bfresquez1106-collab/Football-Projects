@@ -59,9 +59,11 @@ class Model:
         t = c["t_icpt"] + c["t_slope"] * (raw_home + raw_away)
         return m, t
 
-    def predict(self, home, away, neutral=False, home_missing=None, away_missing=None):
+    def predict(self, home, away, neutral=False, home_missing=None, away_missing=None, home_qb=0.0, away_qb=0.0):
+        """home_qb / away_qb: EPA per dropback the starting QB adds over the QBs in the team's ratings."""
         home_missing, away_missing = home_missing or {}, away_missing or {}
-        rh, ra = self.r.raw_scores(home, away, neutral, offense_adj(away_missing), offense_adj(home_missing))
+        ha, aa = offense_adj(away_missing), offense_adj(home_missing)
+        rh, ra = self.r.raw_scores(home, away, neutral, (ha[0] + home_qb, ha[1]), (aa[0] + away_qb, aa[1]))
         m, t = self.calibrate(rh, ra, neutral)
         p = self.pmf(m)
         cdf = np.cumsum(p)

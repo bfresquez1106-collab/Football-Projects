@@ -14,33 +14,55 @@ built and tested on one game.
 ## How a prediction is made
 
 1. **Team ratings.** Ridge regression of EPA/play on offense + defense + home field, fit
-   separately for passes and runs. Garbage time is dropped (win probability outside 5–95%), and
-   last season's plays count 0.20 as a prior.
-2. **Injuries.** Starters come from season-to-date snap counts (top 5 DBs, top 2 LBs). Each
+   separately for passes and runs. Garbage time is dropped (win probability outside 5–95%).
+   Last season's plays count 0.75 in Week 1, fading to 0.20 by Week 9.
+2. **Quarterback.** Each QB gets a rating in expected EPA per dropback (`qb_index.py`, below).
+   If this week's starter is better or worse than the QBs behind the team's current numbers, the
+   team's passing rating moves by the difference. Starters come from the depth chart (QB1 unless
+   he's Out or Doubtful).
+3. **Injuries.** Starters come from season-to-date snap counts (top 5 DBs, top 2 LBs). Each
    starter on the report counts as missing by how often players with that status sit: Out 100%,
    Doubtful 91%, Questionable 40%. A missing starting DB adds +0.008 pass / +0.012 rush EPA/play
    to the opposing offense, and a missing LB adds +0.043 / +0.023 (from `injury_test.py`).
-3. **Raw score.** League points per game + plays × (matchup EPA − league EPA).
-4. **Calibration.** A week-by-week replay of 2022–26 (1,167 games) checks the raw model against
+4. **Raw score.** League points per game + plays × (matchup EPA − league EPA).
+5. **Calibration.** A week-by-week replay of 2022–26 (1,167 games) checks the raw model against
    real results and corrects it:
    - margin = **+2.6 home-field points** (none at neutral sites) + **0.81** × raw margin.
      The raw model under-counts home field and is a bit overconfident.
    - total = 20.9 + **0.52** × raw total. Only about half of the raw total's swing holds up.
-5. **Outcome distribution.** A normal margin (SD 13.0) re-weighted so 3, 7 and other key margins
+6. **Outcome distribution.** A normal margin (SD 13.0) re-weighted so 3, 7 and other key margins
    land as often as they really do. This gives the win probability and the score range.
-6. **Levers and scenarios.** Points over the model's expectation per takeaway (+1.8), giveaway
+7. **Levers and scenarios.** Points over the model's expectation per takeaway (+1.8), giveaway
    (−1.6), sack taken (−1.0) and explosive play (+1.5), learned from the same replay.
 
 ## How good is it (replay, 1,167 games)
 
 | | Brier (0 = perfect, 0.25 = coin flip) | Picks winner | Margin miss |
 |---|---|---|---|
-| **Model** | **0.229** | **63%** | 10.0 pts |
-| Raw model, no calibration | 0.234 | 61% | 10.3 pts |
+| **Model** | **0.223** | **64.6%** | 9.9 pts |
+| Elo benchmark | 0.223 | 63.0% | — |
 | Always pick the home team | 0.248 | 55% | 10.8 pts |
 
 Each season is scored with calibration fit on the other seasons, so the scorecard isn't grading
-its own answers. The season-by-season Brier score holds steady at 0.220–0.235.
+its own answers. Every change and its test result is in [experiments/README.md](experiments/README.md).
+
+## The QB index (`qb_index.py`)
+
+1. **Stability.** Each QB-season split into odd and even dropbacks: a stat that agrees with itself
+   is skill. EPA is half signal after ~250 dropbacks, success rate ~185, CPOE ~355 attempts,
+   sack rate ~330, interception rate ~4,300 (mostly noise).
+2. **Shrinking.** Each stat is pulled toward **replacement level** (backup production) by that
+   amount, so a QB with little history starts as a backup, not as an average starter.
+3. **Recency.** This season counts fully; each season back counts 0.6 as much (chosen on 2023).
+4. **Composite.** A regression on 2019–23 predicted each QB's EPA per dropback in a game from his
+   stats before it. EPA + success rate did best on 2024–26 (6.4% better than "everyone is
+   average"). CPOE, sack rate and interception rate overlap with them and added nothing, so they're
+   shown for style but carry no weight.
+5. **Scale.** The index is 100 for an average starter, 10 points per standard deviation.
+
+Open data behind it: nflverse play-by-play (every dropback since 1999, CPOE since 2006) and daily
+depth charts. Next Gen Stats (2016+) and PFR pressure and bad-throw data (2018+) are also openly
+available and are candidates for future tests.
 
 ## The Elo benchmark
 
@@ -95,7 +117,11 @@ pip install -r requirements.txt
 python3 weekly.py                      # refresh data, predict + log the week, grade, build dashboard
 python3 predict.py DEN KC              # KC at DEN with this week's injury report
 python3 predict.py DEN KC --neutral --home-db-out 2 --away-lb-out 1
+python3 predict.py DEN SEA --away-qb Lock   # what if the backup starts?
+python3 qb_index.py                    # rebuild qb_params.json: stability, weights, out-of-sample test
 python3 calibrate.py --fetch           # rebuild params.json from the 2022+ replay (~1 min + downloads)
+python3 calibrate.py --tag my_test --qb-beta 0.5   # an experiment, saved under experiments/
+python3 compare.py my_test             # judge it against the current model and Elo
 ```
 
 | File | What it is |
@@ -107,9 +133,10 @@ python3 calibrate.py --fetch           # rebuild params.json from the 2022+ repl
 
 ## Next improvements to test
 
-- **QB-level ratings.** Team ratings can't tell when a backup starts, and that's likely the
-  biggest single gain.
-- **Wind and temperature** for totals. Totals are the weakest part (slope 0.52).
+- **More QB inputs** from Next Gen Stats and PFR (pressure-adjusted stats, bad-throw rate), tested
+  against the current index.
+- **A weather forecast source** for totals. Wind showed a real but small pattern; it needs
+  forecasts to be usable before kickoff.
 - **Within-season recency.** Weight recent weeks more than September.
 - **Weight missing starters by quality**, so an All-Pro corner counts for more than a depth player.
 

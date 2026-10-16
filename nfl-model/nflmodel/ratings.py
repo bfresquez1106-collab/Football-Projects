@@ -2,7 +2,9 @@
 import numpy as np
 import pandas as pd
 
-W_PRIOR = 0.20   # weight on prior-season plays (tuned by walk-forward backtest)
+W_PRIOR = 0.20   # weight on prior-season plays late in the season
+W_EARLY = 0.75   # ...and in Week 1, fading to W_PRIOR over FADE_WEEKS (replay: better early, same late)
+FADE_WEEKS = 8
 ALPHA = 250.0    # ridge shrinkage, in "plays"
 
 
@@ -12,8 +14,22 @@ def wavg(x, w):
     return float((x[m] * w[m]).sum() / w[m].sum())
 
 
-def training_frame(pbp_by_season, season, before_week, w_prior=W_PRIOR):
-    """Plays known before `season` week `before_week`: that season (weight 1) + prior season (w_prior)."""
+def prior_weight(before_week, w_late=W_PRIOR, w_early=W_EARLY, fade_weeks=FADE_WEEKS):
+    """
+    Weight on last season's plays. With w_early set, it starts at w_early in Week 1 and fades
+    linearly to w_late over `fade_weeks` weeks: last season matters most when this season has
+    barely started.
+    """
+    if w_early is None:
+        return w_late
+    return w_late + (w_early - w_late) * max(0.0, 1 - (before_week - 1) / fade_weeks)
+
+
+def training_frame(pbp_by_season, season, before_week, w_prior=prior_weight):
+    """Plays known before `season` week `before_week`: that season (weight 1) + prior season (w_prior).
+    w_prior may be a number or a function of before_week."""
+    if callable(w_prior):
+        w_prior = w_prior(before_week)
     parts = []
     if season - 1 in pbp_by_season:
         parts.append(pbp_by_season[season - 1].assign(w=w_prior))

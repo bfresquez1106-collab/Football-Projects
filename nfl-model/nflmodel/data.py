@@ -9,7 +9,8 @@ LINE_COLS = ["spread_line", "total_line", "away_moneyline", "home_moneyline", "a
              "home_spread_odds", "under_odds", "over_odds"]
 PBP_COLS = ["season", "season_type", "week", "game_id", "home_team", "away_team", "location",
             "posteam", "defteam", "pass", "rush", "epa", "wp", "qb_kneel", "qb_spike", "sack",
-            "interception", "fumble_lost", "yards_gained", "success", "down", "home_score", "away_score"]
+            "interception", "fumble_lost", "yards_gained", "success", "down", "home_score", "away_score",
+            "qb_dropback", "passer_id"]
 FILES = {"pbp": "pbp/play_by_play_{s}.csv.gz", "snaps": "snap_counts/snap_counts_{s}.csv",
          "injuries": "injuries/injuries_{s}.csv"}
 LOCAL = {"pbp": "pbp_{s}.csv.gz", "snaps": "snap_counts_{s}.csv", "injuries": "injuries_{s}.csv"}
@@ -33,6 +34,7 @@ def fetch(data_dir, seasons, current):
             dest = data_dir / LOCAL[kind].format(s=s)
             if s == current or not dest.exists():
                 _get(f"{RELEASES}/{remote.format(s=s)}", dest)
+    _get(f"{RELEASES}/depth_charts/depth_charts_{current}.csv", data_dir / f"depth_charts_{current}.csv")
 
 
 def games(data_dir):
@@ -57,6 +59,18 @@ def snaps(data_dir, season):
 def injuries(data_dir, season):
     p = Path(data_dir) / LOCAL["injuries"].format(s=season)
     return pd.read_csv(p) if p.exists() else pd.DataFrame()
+
+
+def depth_qbs(data_dir, season):
+    """Each team's QBs on its latest depth chart, in order (rank 1 = starter)."""
+    p = Path(data_dir) / f"depth_charts_{season}.csv"
+    if not p.exists():
+        return pd.DataFrame(columns=["team", "gsis_id", "name", "rank"])
+    d = pd.read_csv(p, usecols=["dt", "team", "player_name", "gsis_id", "pos_abb", "pos_rank"])
+    d = d[d.pos_abb == "QB"]
+    d = d[d.dt == d.groupby("team").dt.transform("max")]
+    return (d.groupby(["team", "gsis_id"]).agg(name=("player_name", "first"), rank=("pos_rank", "min"))
+            .reset_index().sort_values(["team", "rank"]))
 
 
 def team_game_levers(plays):
