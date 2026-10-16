@@ -1,0 +1,5 @@
+game_id,forecaster,home_margin,total,home_wp,note
+2026_06_SEA_DEN,market,-2.5,40.5,0.423,closing line DEN +2.5 / 40.5; win prob via key-number distribution
+2026_06_SEA_DEN,model_tested_injuries,-1.7,40.0,0.447,EPA model with injury effects from injury_test.py
+2026_06_SEA_DEN,original_blend,-3.3,40.5,0.400,30% model weight with judgement-call injuries (+0.07 / -0.03)
+2026_06_SEA_DEN,original_model_only,-5.1,37.8,0.347,EPA model alone with judgement-call injuries

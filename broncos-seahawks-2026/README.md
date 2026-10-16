@@ -32,6 +32,37 @@ blend weight is 0. The model is still useful for two things:
 
 Turnovers dominate. Play-mix tilts are small and shrunk by half, because defenses adjust.
 
+## Result and grading (`grade.py`)
+
+**Final: DEN 17, SEA 14 in overtime.** Denver won outright as a 2.5-point underdog, and the game
+went well under 40.5.
+
+| Forecaster | Margin | Error | Total | Error | DEN win prob | Brier |
+|---|---|---|---|---|---|---|
+| Model, tested injuries | −1.7 | 4.7 | 40.0 | −9.0 | 44.7% | **0.306** |
+| Market | −2.5 | 5.5 | 40.5 | −9.5 | 42.3% | 0.333 |
+| Original blend (30% model) | −3.3 | 6.3 | 40.5 | −9.5 | 40.0% | 0.360 |
+| Original model only | −5.1 | 8.1 | 37.8 | **−6.8** | 34.7% | 0.426 |
+
+- **Nothing was badly wrong.** The actual margin landed at the 65th–74th percentile of every
+  forecast, and the total at the 24th–30th. A 3-point Denver win had about a 30% chance under
+  every forecast, so this result is well inside normal.
+- **The tested injury adjustments beat the judgement calls** on margin and Brier score. That's
+  the right direction, but one game can't prove it.
+- **Overtime pushed the margin onto 3.** 57% of overtime games since 2016 ended by exactly 3,
+  and the key-number distribution put 7.6% on DEN by exactly 3, against 2.7% for a plain normal.
+- **The total missed by 9–10 points for everyone.** Historically lines slightly under-price wind
+  (calm games: +1.5 pts over the line; 10+ mph: −1.5). Weather isn't in nflverse for this game
+  yet, but wind is a candidate feature for the total.
+- **Data check:** `games.csv` lists Drew Lock as SEA's QB for weeks 2–6, but the play-by-play
+  shows Darnold threw every pass in weeks 3–5. Confirm who started from the play-by-play before
+  reading anything into the QB.
+- **Lever grading** (did the defense take over?) runs automatically once the week 6
+  play-by-play is published.
+
+Every forecast now goes into `forecast_log.csv` before kickoff, and `grade.py` scores them.
+Separating forecasters whose Brier scores differ by a few hundredths takes hundreds of games.
+
 ## Injury adjustments, tested (`injury_test.py`)
 
 The original adjustments (+0.07 EPA to DEN pass D, −0.03 to SEA run game) were judgement calls.
@@ -115,7 +146,7 @@ DEN 2+ takeaways, 0 giveaways, 4+ sacks, ≤1 sack allowed. Visual version: `def
   rest days, travel and weather.
 - Weight missing starters by quality (e.g. prior-season EPA or PFF grade) so an elite CB counts
   for more than a depth starter.
-- Log every forecast before kickoff and score it after the game (Brier score).
+- Add wind and temperature to the total, and QB-level ratings to the margin.
 
 ## Run it
 
@@ -135,6 +166,7 @@ python3 backtest.py                      # ~1 minute
 python3 injury_test.py                   # ~1 minute
 python3 scenarios.py
 python3 defense_takes_over.py
+python3 grade.py                         # scores forecast_log.csv against results
 ```
 
 Data: [nflverse](https://github.com/nflverse/nflverse-data) play-by-play, schedules, injury reports

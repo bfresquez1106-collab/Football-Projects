@@ -1,0 +1,5 @@
+game_id,forecaster,home_margin,total_fc,home_wp,note,season,result,total,overtime,margin_err,total_err,brier,log_loss,right_side,margin_pctile,total_pctile
+2026_06_SEA_DEN,market,-2.5,40.5,0.423,closing line DEN +2.5 / 40.5; win prob via key-number distribution,2026,3.0,31.0,1.0,5.5,-9.5,0.332929,0.8603830999358592,False,0.668140699972628,0.23539200230775825
+2026_06_SEA_DEN,model_tested_injuries,-1.7,40.0,0.447,EPA model with injury effects from injury_test.py,2026,3.0,31.0,1.0,4.7,-9.0,0.30580899999999994,0.8051966843685682,False,0.6462656784345894,0.247225735097224
+2026_06_SEA_DEN,original_blend,-3.3,40.5,0.4,30% model weight with judgement-call injuries (+0.07 / -0.03),2026,3.0,31.0,1.0,6.3,-9.5,0.36,0.916290731874155,False,0.6894615789284957,0.23539200230775825
+2026_06_SEA_DEN,original_model_only,-5.1,37.8,0.347,EPA model alone with judgement-call injuries,2026,3.0,31.0,1.0,8.1,-6.799999999999997,0.42640900000000004,1.058430499035278,False,0.7351481775826901,0.30284680634402383
