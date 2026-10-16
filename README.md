@@ -8,6 +8,7 @@ grows into a real question, it moves here.
 
 | Project | Question | Data |
 |---|---|---|
+| [elo-model](elo-model/) | How far does one number per team, updated from final scores, get you? (A learning project.) | nflverse schedules and scores, 1999–2026 |
 | [nfl-model](nfl-model/) | How well can on-field data alone predict every NFL game, week by week? | nflverse play-by-play, schedules, injuries, snap counts (2021–26) |
 | [broncos-seahawks-2026](broncos-seahawks-2026/) | What are Denver's chances vs Seattle in Week 6, and which levers matter most? | nflverse play-by-play 2024–26, schedules |
 
