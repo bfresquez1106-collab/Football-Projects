@@ -47,8 +47,13 @@
   "yac": 0.017599645339745625,
   "success": 0.039339150001600015
  },
- "starter_mean": 0.06830585776747432,
- "starter_sd": 0.08315606688699818,
+ "starter_mean": 0.09707318545227497,
+ "starter_sd": 0.06756521514449303,
+ "scheme": {
+  "qb_penalty": 250,
+  "context_penalty": 1000,
+  "weight": 1.0
+ },
  "stability": {
   "epa": {
    "split_half_r": 0.47732150825886194,

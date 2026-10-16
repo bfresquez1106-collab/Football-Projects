@@ -114,6 +114,33 @@ def composite(z, p):
     return p["intercept"] + sum(w * z[st] for st, w in p["weights"].items())
 
 
+def scheme_context(sums, season, before_week, p):
+    """
+    How much each QB's numbers were lifted (or held down) by the teams around him.
+
+    A ridge fit of EPA per dropback = mean + QB + team-season context, on the same recency-weighted
+    window as the ratings. QBs who changed teams and backups in the same scheme are what let it
+    tell a QB from his team. Returns each QB's dropback-weighted context, in EPA per dropback.
+    """
+    s = sums[((sums.season == season) & (sums.week < before_week))
+             | ((sums.season < season) & (sums.season >= season - SEASONS_BACK))]
+    w = (p.get("decay", DECAY) ** (season - s.season)) * s.n
+    c = pd.DataFrame({"qb": s.passer_id, "ts": s.team + "_" + s.season.astype(str), "w": w,
+                      "wy": w * s.epa / s.n}).groupby(["qb", "ts"]).sum().reset_index()
+    q, t = pd.Categorical(c.qb), pd.Categorical(c.ts)
+    nq, nt = len(q.categories), len(t.categories)
+    idx = [q.codes.astype(np.int64), nq + t.codes.astype(np.int64), np.full(len(c), nq + nt)]
+    A, b = np.zeros((nq + nt + 1,) * 2), np.zeros(nq + nt + 1)
+    for i in idx:
+        np.add.at(b, i, c.wy.values)
+        for j in idx:
+            np.add.at(A, (i, j), c.w.values)
+    pen = np.r_[np.full(nq, p["scheme"]["qb_penalty"]), np.full(nt, p["scheme"]["context_penalty"]), 0.0]
+    beta = np.linalg.solve(A + np.diag(pen), b)
+    c["ctx"] = beta[nq + t.codes.astype(np.int64)]
+    return (c.ctx * c.w).groupby(c.qb).sum() / c.w.groupby(c.qb).sum()
+
+
 def ratings_as_of(sums, season, before_week, p):
     """Every QB's rating before a given week, plus each stat's 100-scale index."""
     raw = raw_as_of(sums, season, before_week, p.get("decay", DECAY))
@@ -122,6 +149,10 @@ def ratings_as_of(sums, season, before_week, p):
     out = sh[["name", "team", "n"]].copy()
     # designed runs count at face value (EPA per dropback), on top of the passing composite
     out["rating"] = composite(z, p) + p.get("run_weight", 0.0) * sh["run"]
+    if p.get("scheme"):
+        # take out what the QB's teams added, so the rating travels with the QB, not the scheme
+        out["scheme"] = scheme_context(sums, season, before_week, p).reindex(out.index).fillna(0.0)
+        out["rating"] -= p["scheme"].get("weight", 1.0) * out["scheme"]
     for st in STATS:
         sign = 1 if GOOD_HIGH[st] else -1
         out[f"{st}_index"] = 100 + 10 * sign * z[st]

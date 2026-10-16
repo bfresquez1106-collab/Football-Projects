@@ -58,7 +58,11 @@ its own answers. Every change and its test result is in [experiments/README.md](
    A regression on 2019–26 credits YAC at ~75% of throw value per point, alongside success rate.
    **Designed runs** are added at face value. CPOE and sack rate are shown for style but add
    nothing; interception rate is noise.
-5. **Scale.** The index is 100 for an average starter, 10 points per standard deviation.
+5. **Scheme.** A second ridge fit splits EPA per dropback into *QB + team context*. QBs who changed
+   teams and backups in the same offense are what separate the two. Each QB's rating then drops or
+   rises by the context of the teams he played for, so it travels with him. The setting was chosen
+   by the transfer test in `qb_lab.py` (how well a rating predicts a QB on his new team).
+6. **Scale.** The index is 100 for an average starter, 10 points per standard deviation.
 
 **Checked against the real world:** the index and ESPN QBR rank QBs similarly (rank correlation
 0.79). The remaining gaps are mostly intentional. QBR reflects recent games and doesn't shrink
@@ -139,9 +143,9 @@ python3 compare.py my_test             # judge it against the current model and 
 
 ## Next improvements to test
 
-- **QB index, next candidates:** adjust for opponent defenses faced; use PFR pressure data so sacks
-  behind a bad line count less against the QB; a draft-position prior for rookies (who all start at
-  backup level today); and separating QB from scheme using QBs who changed teams.
+- **QB index, next candidates:** a draft-position prior for rookies (who all start at backup level
+  today). Already tested and rejected: opponent adjustment, playmaking stats, pressure rates (see
+  `experiments/README.md` and `qb_lab.py`).
 - **A weather forecast source** for totals. Wind showed a real but small pattern; it needs
   forecasts to be usable before kickoff.
 - **Within-season recency.** Weight recent weeks more than September.

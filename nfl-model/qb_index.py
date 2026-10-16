@@ -107,6 +107,8 @@ def main():
     ap.add_argument("--data-dir", default="data")
     ap.add_argument("--composite", default=",".join(qb.COMPOSITE), help="stats the regression weights")
     ap.add_argument("--run-weight", type=float, default=1.0, help="designed-run value added at this weight")
+    ap.add_argument("--scheme-penalty", type=float, default=1000,
+                    help="team-context ridge penalty for the scheme adjustment (0 = off); chosen by qb_lab.py")
     ap.add_argument("--out", default="qb_params.json")
     a = ap.parse_args()
     comp = a.composite.split(",")
@@ -182,6 +184,17 @@ def main():
     pred = (p["intercept"] + sum(w * starters[st] for st, w in p["weights"].items())
             + a.run_weight * (starters["run"] * p["sd"]["run"] + p["mean"]["run"]))
     p["starter_mean"], p["starter_sd"] = float(pred.mean()), float(pred.std())
+    if a.scheme_penalty:
+        p["scheme"] = {"qb_penalty": 250, "context_penalty": a.scheme_penalty, "weight": 1.0}
+        # re-center the 100 scale on starters after the scheme adjustment (QBs with 300+ dropbacks
+        # in a season, rated at that season's end)
+        st = []
+        for s_ in range(2019, 2026):
+            r = qb.ratings_as_of(sums, s_, 99, p)
+            cur = sums[sums.season == s_].groupby("passer_id").n.sum()
+            st.append(r.rating[r.index.isin(cur[cur >= 300].index)])
+        st = pd.concat(st)
+        p["starter_mean"], p["starter_sd"] = float(st.mean()), float(st.std())
     p["stability"], p["test"] = stab, results
     json.dump(p, open(a.out, "w"), indent=1)
 
