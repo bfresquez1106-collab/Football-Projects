@@ -1,0 +1,592 @@
+<title>Gridiron Model</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: a personal game-week console. Sticky tab bar, one working surface per tab; the scoreboard is the loud element. */
+:root {
+  --bg: #F3F5F8;
+  --surface: #FFFFFF;
+  --ink: #101A2E;
+  --ink-2: #46516A;
+  --ink-3: #6C7790;
+  --rule: #DCE1EA;
+  --wash: #E9EDF3;
+  --accent: #D9531E;
+  --home: #D9531E;
+  --away: #3D62A6;
+  --board: #101A2E;
+  --board-ink: #F3F5F8;
+  --board-dim: #9AA6BF;
+  --good: #2F7D4F;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0B1220; --surface: #121B2D; --ink: #E8ECF3; --ink-2: #B4BDCE; --ink-3: #8792A8;
+    --rule: #26324A; --wash: #1A2438; --accent: #E0682E; --home: #E0682E; --away: #5F86CF;
+    --board: #18233A; --board-ink: #F3F5F8; --board-dim: #9AA6BF; --good: #5DB07F; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0B1220; --surface: #121B2D; --ink: #E8ECF3; --ink-2: #B4BDCE; --ink-3: #8792A8;
+  --rule: #26324A; --wash: #1A2438; --accent: #E0682E; --home: #E0682E; --away: #5F86CF;
+  --board: #18233A; --board-ink: #F3F5F8; --board-dim: #9AA6BF; --good: #5DB07F; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header.top { padding-block: 24px 8px; }
+.brand { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; }
+h1 { font-family: var(--display); font-weight: 800; font-size: 40px; line-height: 1; margin: 0; text-transform: uppercase; letter-spacing: 0.01em; }
+h1 span { color: var(--accent); }
+h2 { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1.1; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-weight: 700; font-size: 20px; margin: 0; letter-spacing: 0.02em; }
+p { margin: 0; max-width: 68ch; }
+.meta, .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-2); }
+.small { font-size: 13px; color: var(--ink-3); }
+
+nav.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--rule); }
+nav.tabs .wrap { display: flex; gap: 4px; overflow-x: auto; }
+nav.tabs button { font: 600 15px/1 var(--body); color: var(--ink-2); background: none; border: 0; padding: 14px 12px 12px; border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+nav.tabs button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, .game:focus-visible, th button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { padding-block: 24px 64px; }
+.panel { display: flex; flex-direction: column; gap: 28px; }
+.section { display: flex; flex-direction: column; gap: 14px; }
+
+/* This week */
+.slate { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+.game { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.game:hover { border-color: var(--ink-3); }
+.game .when { font-family: var(--mono); font-size: 12px; color: var(--ink-3); display: flex; justify-content: space-between; gap: 8px; }
+.row { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: baseline; gap: 8px; }
+.row .t { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: 0.04em; }
+.row .pts { font-family: var(--display); font-weight: 700; font-size: 26px; font-variant-numeric: tabular-nums; }
+.row .wp { font-family: var(--mono); font-size: 13px; color: var(--ink-2); }
+.row.fav .t { color: var(--ink); }
+.split { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 2px; background: var(--surface); }
+.split i { display: block; height: 100%; }
+.final { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.final b { color: var(--ink); }
+
+/* Matchup */
+.controls { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: 12px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+select, input[type="number"] { font: 500 15px var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 7px 10px; min-width: 0; }
+input[type="number"] { width: 84px; }
+.check { display: flex; align-items: center; gap: 6px; font-size: 14px; padding-bottom: 8px; }
+.inj { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.inj .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.inj .inputs { display: flex; gap: 12px; flex-wrap: wrap; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font: 500 13px var(--body); cursor: pointer; text-align: left; }
+.board { background: var(--board); color: var(--board-ink); border-radius: 10px; padding: 18px 22px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+.board .team { display: flex; flex-direction: column; gap: 2px; }
+.board .team.r { text-align: right; }
+.board .abbr { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: 0.06em; }
+.board .abbr.away { color: var(--away); }
+.board .abbr.home { color: var(--home); }
+.board .pts { font-family: var(--display); font-weight: 800; font-size: clamp(52px, 12vw, 88px); line-height: 0.9; font-variant-numeric: tabular-nums; }
+.board .sub { font-family: var(--mono); font-size: 13px; color: var(--board-dim); }
+.board .mid { font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--board-dim); text-align: center; max-width: 12ch; }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.fact { border-top: 2px solid var(--ink); padding-top: 8px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fact .v { font-family: var(--display); font-weight: 700; font-size: 32px; line-height: 1; font-variant-numeric: tabular-nums; }
+.fact .l { font-size: 13px; color: var(--ink-2); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font-family: var(--mono); font-size: 12px; fill: var(--ink-3); }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 7px 10px; font-size: 13px; color: var(--ink-2); box-shadow: 0 4px 16px rgba(16, 26, 46, 0.14); white-space: nowrap; z-index: 2; }
+.tip b { color: var(--ink); font-family: var(--mono); }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.two > * { min-width: 0; }
+
+/* tables */
+.tw { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child { text-align: left; }
+th { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+th button { all: unset; cursor: pointer; }
+th button[aria-sort]::after { content: " ↓"; }
+td { color: var(--ink-2); }
+td.strong, td:first-child { color: var(--ink); font-weight: 500; }
+.pos { color: var(--good); }
+.empty { background: var(--surface); border: 1px dashed var(--rule); border-radius: 8px; padding: 18px; color: var(--ink-2); }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 720px) { .two, .inj { grid-template-columns: 1fr; } .facts, .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .board { padding: 14px; } h1 { font-size: 34px; } }
+</style>
+
+<header class="top wrap">
+  <div class="brand">
+    <h1>Gridiron <span>Model</span></h1>
+    <span class="meta" id="meta"></span>
+  </div>
+</header>
+<nav class="tabs" aria-label="Sections">
+  <div class="wrap" role="tablist">
+    <button role="tab" id="tab-week" aria-controls="p-week" aria-selected="true">This week</button>
+    <button role="tab" id="tab-matchup" aria-controls="p-matchup" aria-selected="false">Matchup</button>
+    <button role="tab" id="tab-record" aria-controls="p-record" aria-selected="false">Record</button>
+    <button role="tab" id="tab-ratings" aria-controls="p-ratings" aria-selected="false">Ratings</button>
+  </div>
+</nav>
+<main class="wrap">
+  <section class="panel" id="p-week" role="tabpanel" aria-labelledby="tab-week">
+    <div class="section">
+      <h2 id="week-h">This week</h2>
+      <p class="muted">Every game on the slate, from the model alone: no betting lines. Tap a game to open it in Matchup and change the inputs.</p>
+      <div class="slate" id="slate"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-matchup" role="tabpanel" aria-labelledby="tab-matchup" hidden>
+    <div class="section">
+      <h2>Matchup</h2>
+      <div class="controls">
+        <div class="field"><label for="pick">Scheduled game</label><select id="pick"></select></div>
+        <div class="field"><label for="away">Away</label><select id="away"></select></div>
+        <div class="field"><label for="home">Home</label><select id="home"></select></div>
+        <label class="check"><input type="checkbox" id="neutral"> Neutral site</label>
+      </div>
+      <div class="inj">
+        <div class="card" id="inj-away"></div>
+        <div class="card" id="inj-home"></div>
+      </div>
+    </div>
+    <div class="board" id="board" role="img"></div>
+    <div class="facts" id="facts"></div>
+    <div class="section">
+      <h3>Final margin</h3>
+      <div class="legend" id="dist-legend"></div>
+      <div class="chart" id="dist"></div>
+      <p class="small" id="dist-note"></p>
+    </div>
+    <div class="section">
+      <div class="controls">
+        <h3 style="flex: 1 1 auto">What moves this game</h3>
+        <div class="field"><label for="focus">Upside for</label><select id="focus"></select></div>
+      </div>
+      <div class="two">
+        <div class="tw"><table id="levers"></table></div>
+        <div class="tw"><table id="scen"></table></div>
+      </div>
+      <p class="small">Lever and scenario values come from 2022–26 games: points scored over the model's expectation when each thing happens. They describe winning games and don't prove what causes wins, because teams that fall behind pass more and so take more sacks and turnovers.</p>
+    </div>
+  </section>
+
+  <section class="panel" id="p-record" role="tabpanel" aria-labelledby="tab-record" hidden>
+    <div class="section">
+      <h2>This season's record</h2>
+      <p class="muted">Each game is graded on the last prediction logged before kickoff. Brier score is the squared gap between the win probability and what happened: 0 is perfect, and 0.25 is a coin flip.</p>
+      <div id="season-record"></div>
+    </div>
+    <div class="section">
+      <h2>Track record in the replay</h2>
+      <p class="muted" id="bt-note"></p>
+      <div class="tiles" id="bt-tiles"></div>
+      <div class="two">
+        <div class="section">
+          <h3>Calibration</h3>
+          <p class="small">When the model gives the home team a given chance, how often do they win? Dots on the diagonal mean the probabilities can be taken at face value.</p>
+          <div class="chart" id="calib"></div>
+        </div>
+        <div class="section">
+          <h3>By season</h3>
+          <div class="tw"><table id="by-season"></table></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-ratings" role="tabpanel" aria-labelledby="tab-ratings" hidden>
+    <div class="section">
+      <h2>Team ratings</h2>
+      <p class="muted">Opponent-adjusted EPA per play against an average team; positive is good on both sides of the ball. Net is the predicted margin against an average team on a neutral field.</p>
+      <div class="tw"><table id="ratings"></table></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const DATA = {"meta": {"season": 2026, "week": 6, "generated": "2026-10-16T04:46+00:00", "params_built": "2026-10-16"}, "ratings": {"ppg": 23.192653673163427, "lg_epa": 0.014270368583618909, "pass": {"icpt": 0.07615215860513369, "home": 0.015557412548052504}, "rush": {"icpt": -0.08489872087626021, "home": -0.022574537112390654}, "teams": {"ARI": {"off_pass": -0.025921966065876482, "def_pass": 0.0886744991148597, "off_rush": -0.008353609771004657, "def_rush": -0.028756247227291303, "pace": 65.67857142857143, "pass_rate": 0.659493670886076}, "ATL": {"off_pass": -0.04348205054173473, "def_pass": -0.048370704092129235, "off_rush": 0.03302438457105852, "def_rush": -0.010418872415951687, "pace": 65.26190476190476, "pass_rate": 0.5417040358744395}, "BAL": {"off_pass": 0.041877161882786874, "def_pass": 0.005928021990735861, "off_rush": 0.05795439705435111, "def_rush": -0.009452432508568883, "pace": 63.48809523809523, "pass_rate": 0.5627782724844168}, "BUF": {"off_pass": 0.1057776106594098, "def_pass": 0.011420378591026502, "off_rush": 0.05697358310395556, "def_rush": 0.05021642021337536, "pace": 65.45238095238095, "pass_rate": 0.5924559245592457}, "CAR": {"off_pass": 0.039108979252144814, "def_pass": 0.043754088808633566, "off_rush": -0.007446365666152071, "def_rush": 0.0010716435652862878, "pace": 66.27027027027026, "pass_rate": 0.6390760346487008}, "CHI": {"off_pass": 0.041061612488565546, "def_pass": -0.04723533914259478, "off_rush": 0.016370476291067793, "def_rush": 0.03314712712075813, "pace": 64.27380952380953, "pass_rate": 0.5844103392568659}, "CIN": {"off_pass": 0.017869290293928648, "def_pass": -0.006303804487049363, "off_rush": 0.03394522973622185, "def_rush": 0.03151682465984195, "pace": 63.61904761904761, "pass_rate": 0.6858616244091105}, "CLE": {"off_pass": -0.06430998078676155, "def_pass": -0.0783528534789247, "off_rush": -0.06194715900709206, "def_rush": 0.025730025917035576, "pace": 63.21428571428571, "pass_rate": 0.643211547135769}, "DAL": {"off_pass": 0.07799356580194285, "def_pass": 0.13413971137702801, "off_rush": 0.03394253408007346, "def_rush": 0.038048245353194364, "pace": 65.41666666666666, "pass_rate": 0.6633346661335466}, "DEN": {"off_pass": -0.01975670916588796, "def_pass": -0.07770212061340132, "off_rush": 0.00442695607100039, "def_rush": 0.011563579961045766, "pace": 64.98809523809524, "pass_rate": 0.6187707641196014}, "DET": {"off_pass": 0.05313364285309848, "def_pass": 0.042082299546891605, "off_rush": 0.007436491161093099, "def_rush": 0.02144642968460363, "pace": 68.33333333333333, "pass_rate": 0.6108768971332209}, "GB": {"off_pass": 0.07902856967117251, "def_pass": 0.009775350460438145, "off_rush": -0.05188877417930124, "def_rush": 0.019664945336100043, "pace": 63.88095238095238, "pass_rate": 0.6192186798383476}, "HOU": {"off_pass": 0.006908178027389544, "def_pass": -0.02433454173948786, "off_rush": -0.053355539389315206, "def_rush": -0.03511243119446087, "pace": 64.95238095238095, "pass_rate": 0.635671342685371}, "IND": {"off_pass": -0.05063358376885923, "def_pass": 0.025024401509136675, "off_rush": 0.07434523154283779, "def_rush": 0.025369540810977354, "pace": 64.66666666666667, "pass_rate": 0.5890238793464602}, "JAX": {"off_pass": 0.051053794013903954, "def_pass": -0.04461918222958806, "off_rush": 0.017099925065377917, "def_rush": -0.04443965561815744, "pace": 63.035714285714285, "pass_rate": 0.6167770419426049}, "KC": {"off_pass": 0.018300588478139708, "def_pass": 0.01586707034317948, "off_rush": 0.05459140102533607, "def_rush": -0.015513004835543975, "pace": 64.28378378378379, "pass_rate": 0.6401654411764706}, "LA": {"off_pass": 0.07139197047303543, "def_pass": -0.014044411464965949, "off_rush": 0.01970348584199593, "def_rush": -0.015023801741731777, "pace": 66.95238095238095, "pass_rate": 0.6658786446020488}, "LAC": {"off_pass": -0.09595106694096849, "def_pass": -0.043651008714602604, "off_rush": -0.053085403231648565, "def_rush": 0.0009075664364594791, "pace": 63.75, "pass_rate": 0.5962421711899791}, "LV": {"off_pass": 0.006636066001637568, "def_pass": 0.030531703973543135, "off_rush": -0.054146209104601904, "def_rush": -0.015314713577259527, "pace": 64.23809523809524, "pass_rate": 0.6152450090744102}, "MIA": {"off_pass": -0.06949178616376807, "def_pass": 0.09389844150897374, "off_rush": 0.0133415255722978, "def_rush": 0.022362128685429684, "pace": 59.66666666666667, "pass_rate": 0.5607822410147991}, "MIN": {"off_pass": -0.09153769529398935, "def_pass": -0.12071034617953279, "off_rush": -0.026324413640727237, "def_rush": -0.041620541929309855, "pace": 60.61904761904761, "pass_rate": 0.6071737251512533}, "NE": {"off_pass": 0.09273970393940491, "def_pass": -0.03628172076309461, "off_rush": -0.009357857368456355, "def_rush": 0.0007765615512816054, "pace": 62.30952380952382, "pass_rate": 0.6202756780791463}, "NO": {"off_pass": -0.05720427067409543, "def_pass": 0.01730367173838643, "off_rush": -0.027545610592205606, "def_rush": 0.005584173712720482, "pace": 66.04761904761904, "pass_rate": 0.6471774193548387}, "NYG": {"off_pass": 0.005309879175516452, "def_pass": 0.0018364051051440052, "off_rush": -0.04043633295127944, "def_rush": 0.033773507545149566, "pace": 64.94047619047619, "pass_rate": 0.5749223602484472}, "NYJ": {"off_pass": -0.06506095215519274, "def_pass": 0.02617644570745786, "off_rush": -0.026691170240091305, "def_rush": -0.015709916307988906, "pace": 63.21428571428571, "pass_rate": 0.5893501805054151}, "PHI": {"off_pass": -0.03591216369866714, "def_pass": -0.018027951180011305, "off_rush": -0.022773300770533272, "def_rush": -0.016520267441786758, "pace": 64.25, "pass_rate": 0.616967660646787}, "PIT": {"off_pass": -0.02927548142725675, "def_pass": -0.0017193070546629857, "off_rush": 0.04708273656660779, "def_rush": 0.014886538616780397, "pace": 63.04761904761905, "pass_rate": 0.6623700623700625}, "SEA": {"off_pass": 0.017553106314475313, "def_pass": -0.0970686474523638, "off_rush": -0.05684034421440413, "def_rush": -0.07527406082980627, "pace": 62.77380952380952, "pass_rate": 0.5848623853211009}, "SF": {"off_pass": 0.1220658536748419, "def_pass": 0.014986148431519502, "off_rush": 0.027945951799613167, "def_rush": -0.014478063984493313, "pace": 62.96428571428572, "pass_rate": 0.5931003980539584}, "TB": {"off_pass": -0.07449951219515534, "def_pass": -0.024010701635890176, "off_rush": 0.02639323628703002, "def_rush": -0.025374700217932245, "pace": 62.35714285714285, "pass_rate": 0.6292179436284239}, "TEN": {"off_pass": -0.12285140229056879, "def_pass": 0.08005976424766828, "off_rush": -0.01694330173836221, "def_rush": 0.021750560826161686, "pace": 61.607142857142854, "pass_rate": 0.6096173733195449}, "WAS": {"off_pass": -0.0019209518326019565, "def_pass": 0.04097423777368738, "off_rush": -0.007442153904748297, "def_rush": 0.005192889834075917, "pace": 64.96428571428572, "pass_rate": 0.607600341588386}}}, "params": {"calibration": {"m_home": 2.609002520450157, "m_slope": 0.811215062136937, "t_icpt": 20.906984734610383, "t_slope": 0.5231136381561512}, "sd_margin": 13.016604035383427, "sd_total": 13.461469682683916, "key_weights": [0.9997, 0.9996, 0.9994, 0.9992, 0.9989, 0.9986, 0.9981, 0.9974, 0.9966, 0.9955, 0.9942, 0.9924, 0.9901, 0.9873, 0.9837, 0.9793, 0.9738, 0.9671, 0.9589, 0.949, 1.1247, 0.9233, 1.0884, 1.0658, 0.8667, 0.8425, 1.3051, 0.9435, 0.9054, 1.1532, 0.8225, 0.7787, 1.7131, 0.5747, 0.6455, 0.8033, 1.4023, 1.477, 0.9677, 1.2714, 0.9016, 0.7721, 0.8363, 1.2774, 0.8794, 0.4345, 1.6715, 0.4663, 0.4787, 0.4521, 1.2851, 0.3735, 0.8105, 1.6161, 1.1668, 1.1279, 1.1231, 2.5463, 0.6973, 1.0554, 0.2347, 0.7767, 1.1362, 2.3545, 0.8594, 0.7637, 1.3909, 1.4465, 1.035, 0.4607, 0.774, 0.4018, 0.709, 0.8435, 0.8865, 0.5985, 0.5544, 1.5986, 0.8965, 0.5269, 0.8725, 1.0471, 0.8892, 0.894, 1.3771, 1.1884, 0.9614, 0.95, 1.3017, 0.8993, 0.7499, 1.7177, 1.0979, 0.7768, 1.6418, 1.2956, 0.7538, 1.4146, 1.305, 0.8427, 0.8671, 0.8887, 1.0892, 0.924, 0.938, 0.9498, 1.1515, 0.9678, 0.9744, 0.9799, 1.1811, 0.9877, 0.9905, 0.9927, 0.9944, 0.9958, 0.9968, 0.9976, 0.9982, 0.9987, 0.999], "lever_coef": {"takeaways": 1.7723195931105462, "giveaways": -1.5590687553080762, "sacks_made": 0.2298855963620399, "sacks_taken": -0.9451493721394724, "expl_for": 1.5006383799297358, "expl_against": 0.20978960576114436}, "lever_means": {"takeaways": 1.1921097770154374, "giveaways": 1.1921097770154374, "sacks_made": 2.4292452830188678, "sacks_taken": 2.4292452830188678, "expl_for": 5.549313893653516, "expl_against": 5.549313893653516}, "sd_margin_given_levers": 9.131776883011073, "scenario_freq": {"Clean offense": 0.1312178387650086, "Win turnovers by +2": 0.12735849056603774, "Defense takes over": 0.021869639794168096, "Explosive night": 0.012006861063464836, "Great night": 0.009433962264150943}, "k_min": -60, "scenarios": {"Clean offense": {"giveaways": 0, "sacks_taken": 1}, "Win turnovers by +2": {"takeaways": 2, "giveaways": 0}, "Defense takes over": {"takeaways": 2, "giveaways": 0, "sacks_made": 4, "sacks_taken": 1}, "Explosive night": {"giveaways": 0, "expl_for": 10, "expl_against": 5}, "Great night": {"takeaways": 2, "giveaways": 0, "sacks_made": 3, "sacks_taken": 2, "expl_for": 7, "expl_against": 5}}, "effects": {"DB": [0.008, 0.012], "LB": [0.043, 0.023]}}, "missing": {"ARI": {"DB": 0.0, "LB": 0.0, "players": []}, "ATL": {"DB": 0.0, "LB": 0.0, "players": []}, "BAL": {"DB": 0.0, "LB": 0.0, "players": []}, "BUF": {"DB": 0.0, "LB": 0.0, "players": []}, "CAR": {"DB": 0.0, "LB": 0.0, "players": []}, "CHI": {"DB": 0.0, "LB": 0.0, "players": []}, "CIN": {"DB": 0.0, "LB": 0.0, "players": []}, "CLE": {"DB": 0.0, "LB": 0.0, "players": []}, "DAL": {"DB": 0.0, "LB": 0.0, "players": []}, "DEN": {"DB": 2.4, "LB": 0.0, "players": [{"name": "Talanoa Hufanga", "group": "DB", "status": "Out"}, {"name": "Riley Moss", "group": "DB", "status": "Questionable"}, {"name": "Patrick Surtain II", "group": "DB", "status": "Out"}]}, "DET": {"DB": 0.0, "LB": 0.0, "players": []}, "GB": {"DB": 0.0, "LB": 0.0, "players": []}, "HOU": {"DB": 0.0, "LB": 0.0, "players": []}, "IND": {"DB": 0.0, "LB": 0.0, "players": []}, "JAX": {"DB": 0.0, "LB": 0.0, "players": []}, "KC": {"DB": 0.0, "LB": 0.0, "players": []}, "LA": {"DB": 0.0, "LB": 0.0, "players": []}, "LAC": {"DB": 0.0, "LB": 0.0, "players": []}, "LV": {"DB": 0.0, "LB": 0.0, "players": []}, "MIA": {"DB": 0.0, "LB": 0.0, "players": []}, "MIN": {"DB": 0.0, "LB": 0.0, "players": []}, "NE": {"DB": 0.0, "LB": 0.0, "players": []}, "NO": {"DB": 0.0, "LB": 0.0, "players": []}, "NYG": {"DB": 0.0, "LB": 0.0, "players": []}, "NYJ": {"DB": 0.0, "LB": 0.0, "players": []}, "PHI": {"DB": 0.0, "LB": 0.0, "players": []}, "PIT": {"DB": 0.0, "LB": 0.0, "players": []}, "SEA": {"DB": 0.0, "LB": 1.0, "players": [{"name": "Drake Thomas", "group": "LB", "status": "Out"}]}, "SF": {"DB": 0.0, "LB": 0.0, "players": []}, "TB": {"DB": 0.0, "LB": 0.0, "players": []}, "TEN": {"DB": 0.0, "LB": 0.0, "players": []}, "WAS": {"DB": 0.0, "LB": 0.0, "players": []}}, "slate": [{"home": "DEN", "away": "SEA", "neutral": false, "home_pts": 21.536364610370285, "away_pts": 20.341932817812392, "margin": 1.1944317925578944, "total": 41.87829742818268, "home_wp": 0.5224067285220417, "margin_q": {"p10": -16, "p25": -7, "p50": 1, "p75": 8, "p90": 18}, "home_by_7": 0.3010044088088432, "away_by_7": 0.25413023918843247, "game_id": "2026_06_SEA_DEN", "gameday": "2026-10-15", "gametime": "20:15", "kickoff": "2026-10-16T00:15:00+00:00", "played": true, "home_score": 17, "away_score": 14}, {"home": "JAX", "away": "HOU", "neutral": true, "home_pts": 23.521619777209857, "away_pts": 20.088333478262278, "margin": 3.433286298947577, "total": 43.609953255472135, "home_wp": 0.5875548750023479, "margin_q": {"p10": -13, "p25": -5, "p50": 3, "p75": 11, "p90": 21}, "home_by_7": 0.362006564615549, "away_by_7": 0.20446740974943836, "game_id": "2026_06_HOU_JAX", "gameday": "2026-10-18", "gametime": "09:30", "kickoff": "2026-10-18T13:30:00+00:00", "played": false, "home_score": null, "away_score": null}, {"home": "ATL", "away": "CHI", "neutral": false, "home_pts": 22.583043722509828, "away_pts": 21.287542612194713, "margin": 1.2955011103151177, "total": 43.87058633470454, "home_wp": 0.5253654300634938, "margin_q": {"p10": -15, "p25": -7, "p50": 1, "p75": 8, "p90": 18}, "home_by_7": 0.30364299262764805, "away_by_7": 0.251759426650019, "game_id": "2026_06_CHI_ATL", "gameday": "2026-10-18", "gametime": "13:00", "kickoff": "2026-10-18T17:00:00+00:00", "played": false, "home_score": null, "away_score": null}, {"home": "CLE", "away": "BAL", "neutral": false, "home_pts": 21.380850440875893, "away_pts": 22.14902288136906, "margin": -0.7681724404931662, "total": 43.52987332224495, "home_wp": 0.4650222782372286, "margin_q": {"p10": -17, "p25": -8, "p50": -1, "p75": 7, "p90": 16}, "home_by_7": 0.2521613407171328, "away_by_7": 0.30242757087534866, "game_id": "2026_06_BAL_CLE", "gameday": "2026-10-18", "gametime": "13:00", "kickoff": "2026-10-18T17:00:00+00:00", "played": false, "home_score": null, "away_score": null}, {"home": "IND", "away": "TEN", "neutral": false, "home_pts": 26.624782247358056, "away_pts": 18.374902469958897, "margin": 8.249879777399157, "total": 44.99968471731695, "home_wp": 0.719446466156208, "margin_q": {"p10": -7, "p25": -2, "p50": 7, "p75": 17, "p90": 26}, "home_by_7": 0.5065260792884454, "away_by_7": 0.11892037286159277, "game_id": "2026_06_TEN_IND", "gameday": "2026-10-18", "gametime": "13:00", "kickoff": "2026-10-18T17:00:00+00:00", "played": false, "home_score": null, "away_score": null}, {"home": "NE", "away": "NYJ", "neutral": false, "home_pts": 27.307548538353046, "away_pts": 17.566655577963807, "margin": 9.740892960389235, "total": 44.874204116316854, "home_wp": 0.756247676308196, "margin_q": {"p10": -6, "p25": 1, "p50": 8, "p75": 19, "p90": 27}, "home_by_7": 0.5528248692788769, "away_by_7": 0.09835484017935078, "game_id": "2026_06_NYJ_NE", "gameday": "2026-10-18", "gametime": "13:00", "kickoff": "2026-10-18T17:00:00+00:00", "played": false, "home_score": null, "away_score": null}, {"home": "NYG", "away": "NO", "neutral": false, "home_pts": 23.789018927758825, "away_pts": 20.069025466121097, "margin": 3.719993461637726, "total": 43.85804439387992, "home_wp": 0.5957969400236718, "margin_q": {"p10": -13, "p25": -5, "p50": 3, "p75": 12, "p90": 21}, "home_by_7": 0.37017467579622565, "away_by_7": 0.19855117807838935, "game_id": "2026_06_NO_NYG", "gameday": "2026-10-18", "gametime": "13:00", "kickoff": "2026-10-18T17:00:00+00:00", "played": false, "home_score": null, "away_score": null}, {"home": "PHI", "away": "CAR", "neutral": false, "home_pts": 23.696095800382153, "away_pts": 21.642110073597365, "margin": 2.0539857267847896, "total": 45.33820587397952, "home_wp": 0.547537158695236, "margin_q": {"p10": -14, "p25": -6, "p50": 2, "p75": 9, "p90": 19}, "home_by_7": 0.32380653215053123, "away_by_7": 0.23434947288863273, "game_id": "2026_06_CAR_PHI", "gameday": "2026-10-18", "gametime": "13:00", "kickoff": "2026-10-18T17:00:00+00:00", "played": false, "home_score": null, "away_score": null}, {"home": "TB", "away": "PIT", "neutral": false, "home_pts": 22.84168682889184, "away_pts": 20.638328013652323, "margin": 2.203358815239521, "total": 43.480014842544165, "home_wp": 0.5518936557218088, "margin_q": {"p10": -14, "p25": -6, "p50": 2, "p75": 9, "p90": 19}, "home_by_7": 0.32785072654241365, "away_by_7": 0.23100141644172942, "game_id": "2026_06_PIT_TB", "gameday": "2026-10-18", "gametime": "13:00", "kickoff": "2026-10-18T17:00:00+00:00", "played": false, "home_score": null, "away_score": null}, {"home": "LA", "away": "ARI", "neutral": false, "home_pts": 29.164481414435393, "away_pts": 18.937888147885843, "margin": 10.226593266549546, "total": 48.102369562321236, "home_wp": 0.7677027371376671, "margin_q": {"p10": -6, "p25": 1, "p50": 8, "p75": 20, "p90": 28}, "home_by_7": 0.5678626770061618, "away_by_7": 0.09223588381302232, "game_id": "2026_06_ARI_LA", "gameday": "2026-10-18", "gametime": "16:05", "kickoff": "2026-10-18T20:05:00+00:00", "played": false, "home_score": null, "away_score": null}, {"home": "KC", "away": "LAC", "neutral": false, "home_pts": 24.98275216575855, "away_pts": 17.842145217499276, "margin": 7.140606948259274, "total": 42.82489738325783, "home_wp": 0.6906184395720445, "margin_q": {"p10": -8, "p25": -3, "p50": 6, "p75": 16, "p90": 25}, "home_by_7": 0.4722400057359533, "away_by_7": 0.13600944234995516, "game_id": "2026_06_LAC_KC", "gameday": "2026-10-18", "gametime": "16:25", "kickoff": "2026-10-18T20:25:00+00:00", "played": false, "home_score": null, "away_score": null}, {"home": "LV", "away": "BUF", "neutral": false, "home_pts": 23.44333846794978, "away_pts": 25.2538815307497, "margin": -1.8105430627999217, "total": 48.69721999869948, "home_wp": 0.4348226506141519, "margin_q": {"p10": -19, "p25": -10, "p50": -3, "p75": 6, "p90": 14}, "home_by_7": 0.22816761750158163, "away_by_7": 0.32970863670122047, "game_id": "2026_06_BUF_LV", "gameday": "2026-10-18", "gametime": "16:25", "kickoff": "2026-10-18T20:25:00+00:00", "played": false, "home_score": null, "away_score": null}, {"home": "GB", "away": "DAL", "neutral": false, "home_pts": 28.6337571078506, "away_pts": 23.652535612924765, "margin": 4.9812214949258315, "total": 52.286292720775364, "home_wp": 0.6316087954784441, "margin_q": {"p10": -10, "p25": -4, "p50": 3, "p75": 13, "p90": 22}, "home_by_7": 0.40691919756915584, "away_by_7": 0.17375646536375938, "game_id": "2026_06_DAL_GB", "gameday": "2026-10-18", "gametime": "20:20", "kickoff": "2026-10-19T00:20:00+00:00", "played": false, "home_score": null, "away_score": null}, {"home": "SF", "away": "WAS", "neutral": false, "home_pts": 28.458521161736016, "away_pts": 20.202505148448168, "margin": 8.256016013287844, "total": 48.661026310184184, "home_wp": 0.7196026819499979, "margin_q": {"p10": -7, "p25": -2, "p50": 7, "p75": 17, "p90": 26}, "home_by_7": 0.5067164461527336, "away_by_7": 0.11883012945178098, "game_id": "2026_06_WAS_SF", "gameday": "2026-10-19", "gametime": "20:15", "kickoff": "2026-10-20T00:15:00+00:00", "played": false, "home_score": null, "away_score": null}], "schedule": [{"week": 6, "home": "JAX", "away": "HOU", "gameday": "2026-10-18", "neutral": true}, {"week": 6, "home": "ATL", "away": "CHI", "gameday": "2026-10-18", "neutral": false}, {"week": 6, "home": "CLE", "away": "BAL", "gameday": "2026-10-18", "neutral": false}, {"week": 6, "home": "IND", "away": "TEN", "gameday": "2026-10-18", "neutral": false}, {"week": 6, "home": "NE", "away": "NYJ", "gameday": "2026-10-18", "neutral": false}, {"week": 6, "home": "NYG", "away": "NO", "gameday": "2026-10-18", "neutral": false}, {"week": 6, "home": "PHI", "away": "CAR", "gameday": "2026-10-18", "neutral": false}, {"week": 6, "home": "TB", "away": "PIT", "gameday": "2026-10-18", "neutral": false}, {"week": 6, "home": "LA", "away": "ARI", "gameday": "2026-10-18", "neutral": false}, {"week": 6, "home": "KC", "away": "LAC", "gameday": "2026-10-18", "neutral": false}, {"week": 6, "home": "LV", "away": "BUF", "gameday": "2026-10-18", "neutral": false}, {"week": 6, "home": "GB", "away": "DAL", "gameday": "2026-10-18", "neutral": false}, {"week": 6, "home": "SF", "away": "WAS", "gameday": "2026-10-19", "neutral": false}, {"week": 7, "home": "CHI", "away": "NE", "gameday": "2026-10-22", "neutral": false}, {"week": 7, "home": "NO", "away": "PIT", "gameday": "2026-10-25", "neutral": true}, {"week": 7, "home": "ATL", "away": "SF", "gameday": "2026-10-25", "neutral": false}, {"week": 7, "home": "BAL", "away": "CIN", "gameday": "2026-10-25", "neutral": false}, {"week": 7, "home": "CAR", "away": "TB", "gameday": "2026-10-25", "neutral": false}, {"week": 7, "home": "HOU", "away": "NYG", "gameday": "2026-10-25", "neutral": false}, {"week": 7, "home": "MIN", "away": "IND", "gameday": "2026-10-25", "neutral": false}, {"week": 7, "home": "NYJ", "away": "MIA", "gameday": "2026-10-25", "neutral": false}, {"week": 7, "home": "TEN", "away": "CLE", "gameday": "2026-10-25", "neutral": false}, {"week": 7, "home": "ARI", "away": "DEN", "gameday": "2026-10-25", "neutral": false}, {"week": 7, "home": "DET", "away": "GB", "gameday": "2026-10-25", "neutral": false}, {"week": 7, "home": "LV", "away": "LA", "gameday": "2026-10-25", "neutral": false}, {"week": 7, "home": "SEA", "away": "KC", "gameday": "2026-10-25", "neutral": false}, {"week": 7, "home": "PHI", "away": "DAL", "gameday": "2026-10-26", "neutral": false}, {"week": 8, "home": "GB", "away": "CAR", "gameday": "2026-10-29", "neutral": false}, {"week": 8, "home": "BUF", "away": "BAL", "gameday": "2026-11-01", "neutral": false}, {"week": 8, "home": "CIN", "away": "TEN", "gameday": "2026-11-01", "neutral": false}, {"week": 8, "home": "DAL", "away": "ARI", "gameday": "2026-11-01", "neutral": false}, {"week": 8, "home": "DET", "away": "MIN", "gameday": "2026-11-01", "neutral": false}, {"week": 8, "home": "JAX", "away": "IND", "gameday": "2026-11-01", "neutral": false}, {"week": 8, "home": "NYJ", "away": "LV", "gameday": "2026-11-01", "neutral": false}, {"week": 8, "home": "PIT", "away": "CLE", "gameday": "2026-11-01", "neutral": false}, {"week": 8, "home": "TB", "away": "ATL", "gameday": "2026-11-01", "neutral": false}, {"week": 8, "home": "LA", "away": "LAC", "gameday": "2026-11-01", "neutral": false}, {"week": 8, "home": "DEN", "away": "KC", "gameday": "2026-11-01", "neutral": false}, {"week": 8, "home": "MIA", "away": "NE", "gameday": "2026-11-01", "neutral": false}, {"week": 8, "home": "WAS", "away": "PHI", "gameday": "2026-11-01", "neutral": false}, {"week": 8, "home": "SEA", "away": "CHI", "gameday": "2026-11-02", "neutral": false}, {"week": 9, "home": "BAL", "away": "JAX", "gameday": "2026-11-05", "neutral": false}, {"week": 9, "home": "ATL", "away": "CIN", "gameday": "2026-11-08", "neutral": true}, {"week": 9, "home": "CAR", "away": "DEN", "gameday": "2026-11-08", "neutral": false}, {"week": 9, "home": "IND", "away": "DAL", "gameday": "2026-11-08", "neutral": false}, {"week": 9, "home": "KC", "away": "NYJ", "gameday": "2026-11-08", "neutral": false}, {"week": 9, "home": "MIA", "away": "DET", "gameday": "2026-11-08", "neutral": false}, {"week": 9, "home": "NO", "away": "CLE", "gameday": "2026-11-08", "neutral": false}, {"week": 9, "home": "PHI", "away": "NYG", "gameday": "2026-11-08", "neutral": false}, {"week": 9, "home": "WAS", "away": "LA", "gameday": "2026-11-08", "neutral": false}, {"week": 9, "home": "LAC", "away": "HOU", "gameday": "2026-11-08", "neutral": false}, {"week": 9, "home": "SF", "away": "LV", "gameday": "2026-11-08", "neutral": false}, {"week": 9, "home": "NE", "away": "GB", "gameday": "2026-11-08", "neutral": false}, {"week": 9, "home": "SEA", "away": "ARI", "gameday": "2026-11-08", "neutral": false}, {"week": 9, "home": "CHI", "away": "TB", "gameday": "2026-11-08", "neutral": false}, {"week": 9, "home": "MIN", "away": "BUF", "gameday": "2026-11-09", "neutral": false}, {"week": 10, "home": "NYG", "away": "WAS", "gameday": "2026-11-12", "neutral": false}, {"week": 10, "home": "DET", "away": "NE", "gameday": "2026-11-15", "neutral": true}, {"week": 10, "home": "ATL", "away": "KC", "gameday": "2026-11-15", "neutral": false}, {"week": 10, "home": "CLE", "away": "HOU", "gameday": "2026-11-15", "neutral": false}, {"week": 10, "home": "GB", "away": "MIN", "gameday": "2026-11-15", "neutral": false}, {"week": 10, "home": "IND", "away": "MIA", "gameday": "2026-11-15", "neutral": false}, {"week": 10, "home": "NO", "away": "CAR", "gameday": "2026-11-15", "neutral": false}, {"week": 10, "home": "NYJ", "away": "BUF", "gameday": "2026-11-15", "neutral": false}, {"week": 10, "home": "TEN", "away": "JAX", "gameday": "2026-11-15", "neutral": false}, {"week": 10, "home": "ARI", "away": "LA", "gameday": "2026-11-15", "neutral": false}, {"week": 10, "home": "LV", "away": "SEA", "gameday": "2026-11-15", "neutral": false}, {"week": 10, "home": "DAL", "away": "SF", "gameday": "2026-11-15", "neutral": false}, {"week": 10, "home": "CIN", "away": "PIT", "gameday": "2026-11-15", "neutral": false}, {"week": 10, "home": "BAL", "away": "LAC", "gameday": "2026-11-16", "neutral": false}, {"week": 11, "home": "HOU", "away": "IND", "gameday": "2026-11-19", "neutral": false}, {"week": 11, "home": "BUF", "away": "MIA", "gameday": "2026-11-22", "neutral": false}, {"week": 11, "home": "CAR", "away": "BAL", "gameday": "2026-11-22", "neutral": false}, {"week": 11, "home": "CHI", "away": "NO", "gameday": "2026-11-22", "neutral": false}, {"week": 11, "home": "DAL", "away": "TEN", "gameday": "2026-11-22", "neutral": false}, {"week": 11, "home": "DET", "away": "TB", "gameday": "2026-11-22", "neutral": false}, {"week": 11, "home": "KC", "away": "ARI", "gameday": "2026-11-22", "neutral": false}, {"week": 11, "home": "NYG", "away": "JAX", "gameday": "2026-11-22", "neutral": false}, {"week": 11, "home": "LAC", "away": "NYJ", "gameday": "2026-11-22", "neutral": false}, {"week": 11, "home": "DEN", "away": "LV", "gameday": "2026-11-22", "neutral": false}, {"week": 11, "home": "PHI", "away": "PIT", "gameday": "2026-11-22", "neutral": false}, {"week": 11, "home": "SF", "away": "MIN", "gameday": "2026-11-22", "neutral": true}, {"week": 11, "home": "WAS", "away": "CIN", "gameday": "2026-11-23", "neutral": false}, {"week": 12, "home": "LA", "away": "GB", "gameday": "2026-11-25", "neutral": false}, {"week": 12, "home": "DET", "away": "CHI", "gameday": "2026-11-26", "neutral": false}, {"week": 12, "home": "DAL", "away": "PHI", "gameday": "2026-11-26", "neutral": false}, {"week": 12, "home": "BUF", "away": "KC", "gameday": "2026-11-26", "neutral": false}, {"week": 12, "home": "PIT", "away": "DEN", "gameday": "2026-11-27", "neutral": false}, {"week": 12, "home": "CIN", "away": "NO", "gameday": "2026-11-29", "neutral": false}, {"week": 12, "home": "CLE", "away": "LV", "gameday": "2026-11-29", "neutral": false}, {"week": 12, "home": "HOU", "away": "BAL", "gameday": "2026-11-29", "neutral": false}, {"week": 12, "home": "IND", "away": "NYG", "gameday": "2026-11-29", "neutral": false}, {"week": 12, "home": "MIA", "away": "NYJ", "gameday": "2026-11-29", "neutral": false}, {"week": 12, "home": "MIN", "away": "ATL", "gameday": "2026-11-29", "neutral": false}, {"week": 12, "home": "JAX", "away": "TEN", "gameday": "2026-11-29", "neutral": false}, {"week": 12, "home": "ARI", "away": "WAS", "gameday": "2026-11-29", "neutral": false}, {"week": 12, "home": "SF", "away": "SEA", "gameday": "2026-11-29", "neutral": false}, {"week": 12, "home": "LAC", "away": "NE", "gameday": "2026-11-29", "neutral": false}, {"week": 12, "home": "TB", "away": "CAR", "gameday": "2026-11-30", "neutral": false}, {"week": 13, "home": "LA", "away": "KC", "gameday": "2026-12-03", "neutral": false}, {"week": 13, "home": "ATL", "away": "DET", "gameday": "2026-12-06", "neutral": false}, {"week": 13, "home": "CHI", "away": "JAX", "gameday": "2026-12-06", "neutral": false}, {"week": 13, "home": "CLE", "away": "CIN", "gameday": "2026-12-06", "neutral": false}, {"week": 13, "home": "NO", "away": "GB", "gameday": "2026-12-06", "neutral": false}, {"week": 13, "home": "NYG", "away": "SF", "gameday": "2026-12-06", "neutral": false}, {"week": 13, "home": "TB", "away": "LAC", "gameday": "2026-12-06", "neutral": false}, {"week": 13, "home": "TEN", "away": "WAS", "gameday": "2026-12-06", "neutral": false}, {"week": 13, "home": "ARI", "away": "PHI", "gameday": "2026-12-06", "neutral": false}, {"week": 13, "home": "DEN", "away": "MIA", "gameday": "2026-12-06", "neutral": false}, {"week": 13, "home": "MIN", "away": "CAR", "gameday": "2026-12-06", "neutral": false}, {"week": 13, "home": "NE", "away": "BUF", "gameday": "2026-12-06", "neutral": false}, {"week": 13, "home": "PIT", "away": "HOU", "gameday": "2026-12-06", "neutral": false}, {"week": 13, "home": "SEA", "away": "DAL", "gameday": "2026-12-07", "neutral": false}, {"week": 14, "home": "NE", "away": "MIN", "gameday": "2026-12-10", "neutral": false}, {"week": 14, "home": "BAL", "away": "TB", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "CAR", "away": "NO", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "CLE", "away": "ATL", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "DET", "away": "TEN", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "MIA", "away": "CHI", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "NYJ", "away": "DEN", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "PHI", "away": "IND", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "WAS", "away": "HOU", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "LV", "away": "LAC", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "CIN", "away": "KC", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "SEA", "away": "NYG", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "SF", "away": "LA", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "GB", "away": "BUF", "gameday": "2026-12-13", "neutral": false}, {"week": 14, "home": "JAX", "away": "PIT", "gameday": "2026-12-14", "neutral": false}, {"week": 15, "home": "LAC", "away": "SF", "gameday": "2026-12-17", "neutral": false}, {"week": 15, "home": "PHI", "away": "SEA", "gameday": "2026-12-19", "neutral": false}, {"week": 15, "home": "BUF", "away": "CHI", "gameday": "2026-12-19", "neutral": false}, {"week": 15, "home": "CAR", "away": "CIN", "gameday": "2026-12-20", "neutral": false}, {"week": 15, "home": "GB", "away": "MIA", "gameday": "2026-12-20", "neutral": false}, {"week": 15, "home": "HOU", "away": "JAX", "gameday": "2026-12-20", "neutral": false}, {"week": 15, "home": "NYG", "away": "CLE", "gameday": "2026-12-20", "neutral": false}, {"week": 15, "home": "PIT", "away": "BAL", "gameday": "2026-12-20", "neutral": false}, {"week": 15, "home": "TB", "away": "NO", "gameday": "2026-12-20", "neutral": false}, {"week": 15, "home": "TEN", "away": "IND", "gameday": "2026-12-20", "neutral": false}, {"week": 15, "home": "WAS", "away": "ATL", "gameday": "2026-12-20", "neutral": false}, {"week": 15, "home": "ARI", "away": "NYJ", "gameday": "2026-12-20", "neutral": false}, {"week": 15, "home": "LA", "away": "DAL", "gameday": "2026-12-20", "neutral": false}, {"week": 15, "home": "LV", "away": "DEN", "gameday": "2026-12-20", "neutral": false}, {"week": 15, "home": "MIN", "away": "DET", "gameday": "2026-12-20", "neutral": false}, {"week": 15, "home": "KC", "away": "NE", "gameday": "2026-12-21", "neutral": false}, {"week": 16, "home": "PHI", "away": "HOU", "gameday": "2026-12-24", "neutral": false}, {"week": 16, "home": "CHI", "away": "GB", "gameday": "2026-12-25", "neutral": false}, {"week": 16, "home": "DEN", "away": "BUF", "gameday": "2026-12-25", "neutral": false}, {"week": 16, "home": "SEA", "away": "LA", "gameday": "2026-12-25", "neutral": false}, {"week": 16, "home": "ATL", "away": "TB", "gameday": "2026-12-27", "neutral": false}, {"week": 16, "home": "BAL", "away": "CLE", "gameday": "2026-12-27", "neutral": false}, {"week": 16, "home": "IND", "away": "CIN", "gameday": "2026-12-27", "neutral": false}, {"week": 16, "home": "MIA", "away": "LAC", "gameday": "2026-12-27", "neutral": false}, {"week": 16, "home": "MIN", "away": "WAS", "gameday": "2026-12-27", "neutral": false}, {"week": 16, "home": "NO", "away": "ARI", "gameday": "2026-12-27", "neutral": false}, {"week": 16, "home": "NYJ", "away": "NE", "gameday": "2026-12-27", "neutral": false}, {"week": 16, "home": "PIT", "away": "CAR", "gameday": "2026-12-27", "neutral": false}, {"week": 16, "home": "LV", "away": "TEN", "gameday": "2026-12-27", "neutral": false}, {"week": 16, "home": "KC", "away": "SF", "gameday": "2026-12-27", "neutral": false}, {"week": 16, "home": "DAL", "away": "JAX", "gameday": "2026-12-27", "neutral": false}, {"week": 16, "home": "DET", "away": "NYG", "gameday": "2026-12-28", "neutral": false}, {"week": 17, "home": "CIN", "away": "BAL", "gameday": "2026-12-31", "neutral": false}, {"week": 17, "home": "ATL", "away": "NO", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "CAR", "away": "SEA", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "CLE", "away": "IND", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "DAL", "away": "NYG", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "JAX", "away": "WAS", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "LAC", "away": "KC", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "MIA", "away": "BUF", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "NE", "away": "DEN", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "NYJ", "away": "MIN", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "TB", "away": "LA", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "TEN", "away": "PIT", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "ARI", "away": "LV", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "CHI", "away": "DET", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "SF", "away": "PHI", "gameday": "2027-01-03", "neutral": false}, {"week": 17, "home": "GB", "away": "HOU", "gameday": "2027-01-04", "neutral": false}, {"week": 18, "home": "ARI", "away": "SF", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "BAL", "away": "PIT", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "BUF", "away": "NYJ", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "CAR", "away": "ATL", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "CIN", "away": "CLE", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "DEN", "away": "LAC", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "GB", "away": "DET", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "HOU", "away": "TEN", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "IND", "away": "JAX", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "KC", "away": "LV", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "LA", "away": "SEA", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "MIN", "away": "CHI", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "NE", "away": "MIA", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "NO", "away": "TB", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "NYG", "away": "PHI", "gameday": "2027-01-10", "neutral": false}, {"week": 18, "home": "WAS", "away": "DAL", "gameday": "2027-01-10", "neutral": false}], "record": {"summary": {}, "games": []}, "backtest": {"games": 1167, "model": {"brier": 0.2289504530101666, "log_loss": 0.6499269453822313, "mae_margin": 10.04128512707232, "mae_total": 10.642508827272398, "winner_pct": 0.6311263972484953}, "raw_model": {"brier": 0.23383025696217197, "log_loss": 0.6617525529939592, "mae_margin": 10.265313908953884, "mae_total": 10.875510606763928, "winner_pct": 0.6087704213241617}, "always_home": {"brier": 0.2478838417855207, "log_loss": 0.6889088729883419, "mae_margin": 10.793487574978577, "mae_total": 10.836842062752545, "winner_pct": 0.5460017196904557}, "calibration": [{"bin": "(0.0, 0.2]", "games": 6, "predicted": 0.16566147448179835, "actual": 0.16666666666666666}, {"bin": "(0.2, 0.35]", "games": 76, "predicted": 0.3015248254010549, "actual": 0.34210526315789475}, {"bin": "(0.35, 0.5]", "games": 335, "predicted": 0.4413981324666645, "actual": 0.3940298507462686}, {"bin": "(0.5, 0.65]", "games": 509, "predicted": 0.5720395097635534, "actual": 0.5874263261296659}, {"bin": "(0.65, 0.8]", "games": 220, "predicted": 0.708665685058018, "actual": 0.7363636363636363}, {"bin": "(0.8, 1.0]", "games": 21, "predicted": 0.8268479883694316, "actual": 0.8095238095238095}], "by_season": {"2022": {"games": 271, "brier": 0.22824475972661046, "mae_margin": 9.046442203557222}, "2023": {"games": 272, "brier": 0.23512797518356512, "mae_margin": 10.484548535511795}, "2024": {"games": 272, "brier": 0.21962982233086314, "mae_margin": 10.235898131030439}, "2025": {"games": 272, "brier": 0.23252475289531785, "mae_margin": 10.497245591658608}, "2026": {"games": 80, "brier": 0.23033432726870268, "mae_margin": 9.69227014873451}}}};
+(function () {
+  "use strict";
+  const R = DATA.ratings, P = DATA.params, T = R.teams;
+  const TEAMS = Object.keys(T).sort();
+  const KMIN = P.k_min, KW = P.key_weights, K = KW.map((_, i) => KMIN + i);
+  const LEVERS = ["takeaways", "giveaways", "sacks_made", "sacks_taken", "expl_for", "expl_against"];
+  const MIRROR = { takeaways: "giveaways", giveaways: "takeaways", sacks_made: "sacks_taken", sacks_taken: "sacks_made", expl_for: "expl_against", expl_against: "expl_for" };
+  const GOOD_HIGH = { takeaways: true, giveaways: false, sacks_made: true, sacks_taken: false, expl_for: true, expl_against: false };
+
+  // ---------- math: mirrors nflmodel/ratings.py and engine.py ----------
+  function erf(x) { // Abramowitz-Stegun 7.1.26
+    const s = x < 0 ? -1 : 1; x = Math.abs(x);
+    const t = 1 / (1 + 0.3275911 * x);
+    const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+    return s * y;
+  }
+  const cdf = z => 0.5 * (1 + erf(z / Math.SQRT2));
+  function offAdj(miss) {
+    let p = 0, r = 0;
+    for (const g in P.effects) { p += P.effects[g][0] * (miss[g] || 0); r += P.effects[g][1] * (miss[g] || 0); }
+    return [p, r];
+  }
+  function points(off, dfn, h, adj) {
+    const o = T[off], d = T[dfn];
+    const ep = R.pass.icpt + o.off_pass + d.def_pass + R.pass.home * h + adj[0];
+    const er = R.rush.icpt + o.off_rush + d.def_rush + R.rush.home * h + adj[1];
+    const n = (o.pace + d.pace) / 2;
+    return R.ppg + n * (o.pass_rate * ep + (1 - o.pass_rate) * er - R.lg_epa);
+  }
+  function pmf(m, sd) {
+    sd = sd || P.sd_margin;
+    const p = K.map((k, i) => (cdf((k + 0.5 - m) / sd) - cdf((k - 0.5 - m) / sd)) * KW[i]);
+    const s = p.reduce((a, b) => a + b, 0);
+    return p.map(x => x / s);
+  }
+  function winProb(m, sd) {
+    const p = pmf(m, sd);
+    let w = 0;
+    K.forEach((k, i) => { if (k > 0) w += p[i]; else if (k === 0) w += p[i] / 2; });
+    return w;
+  }
+  function predict(home, away, neutral, hm, am) {
+    const h = neutral ? 0 : 0.5, c = P.calibration;
+    const rh = points(home, away, h, offAdj(am)), ra = points(away, home, -h, offAdj(hm));
+    const m = c.m_home * (neutral ? 0 : 1) + c.m_slope * (rh - ra);
+    const t = c.t_icpt + c.t_slope * (rh + ra);
+    return { m, t, hp: (t + m) / 2, ap: (t - m) / 2, wp: winProb(m), p: pmf(m) };
+  }
+  function scenarioShift(cond) { // points over expectation for the focus team and its opponent
+    const mean = P.lever_means, coef = P.lever_coef;
+    const x = {}; LEVERS.forEach(k => { x[k] = k in cond ? cond[k] : mean[k]; });
+    let me = 0, opp = 0;
+    LEVERS.forEach(k => { me += coef[k] * (x[k] - mean[k]); opp += coef[k] * (x[MIRROR[k]] - mean[k]); });
+    return [me, opp];
+  }
+
+  // ---------- small DOM helpers (text always via textContent) ----------
+  function el(tag, attrs, kids) {
+    const e = document.createElement(tag);
+    for (const k in attrs || {}) {
+      if (k === "text") e.textContent = attrs[k];
+      else if (k === "class") e.className = attrs[k];
+      else if (k === "style") e.style.cssText = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    (kids || []).forEach(c => e.appendChild(typeof c === "string" ? document.createTextNode(c) : c));
+    return e;
+  }
+  const NS = "http://www.w3.org/2000/svg";
+  function sv(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  const pct = (x, d) => (x * 100).toFixed(d || 0) + "%";
+  const sgn = x => (x > 0 ? "+" : x < 0 ? "−" : "") + Math.abs(x).toFixed(1);
+  function fmtDay(gd, gt) {
+    const d = new Date(gd + "T12:00:00");
+    const day = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    if (!gt) return day;
+    const [H, M] = gt.split(":").map(Number);
+    return day + " · " + ((H % 12) || 12) + ":" + String(M).padStart(2, "0") + (H < 12 ? " AM" : " PM") + " ET";
+  }
+
+  // ---------- header + tabs ----------
+  const gen = new Date(DATA.meta.generated);
+  document.getElementById("meta").textContent = "Season " + DATA.meta.season + " · Week " + DATA.meta.week +
+    " · Updated " + gen.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const tabs = ["week", "matchup", "record", "ratings"];
+  function show(name) {
+    tabs.forEach(t => {
+      document.getElementById("tab-" + t).setAttribute("aria-selected", String(t === name));
+      document.getElementById("p-" + t).hidden = t !== name;
+    });
+    try { localStorage.setItem("gm-tab", name); } catch (e) { /* storage unavailable */ }
+  }
+  tabs.forEach(t => document.getElementById("tab-" + t).addEventListener("click", () => { show(t); history.replaceState(null, "", "#" + t); }));
+
+  // ---------- this week ----------
+  document.getElementById("week-h").textContent = "Week " + DATA.meta.week;
+  const slate = document.getElementById("slate");
+  DATA.slate.forEach(g => {
+    const awayFav = g.home_wp < 0.5;
+    const card = el("button", { class: "game", type: "button", "aria-label": g.away + " at " + g.home + ", open in Matchup" }, [
+      el("div", { class: "when" }, [el("span", { text: fmtDay(g.gameday, g.gametime) }), el("span", { text: g.neutral ? "Neutral site" : "" })]),
+      el("div", { class: "row" + (awayFav ? " fav" : "") }, [el("span", { class: "t", text: g.away }), el("span", { class: "wp", text: pct(1 - g.home_wp) }), el("span", { class: "pts", text: g.away_pts.toFixed(1) })]),
+      el("div", { class: "row" + (!awayFav ? " fav" : "") }, [el("span", { class: "t", text: g.home }), el("span", { class: "wp", text: pct(g.home_wp) }), el("span", { class: "pts", text: g.home_pts.toFixed(1) })]),
+      el("div", { class: "split", "aria-hidden": "true" }, [
+        el("i", { style: "width:" + ((1 - g.home_wp) * 100).toFixed(1) + "%;background:var(--away)" }),
+        el("i", { style: "width:" + (g.home_wp * 100).toFixed(1) + "%;background:var(--home)" })])
+    ]);
+    if (g.played) card.appendChild(el("div", { class: "final" }, ["Final: ", el("b", { text: g.away + " " + g.away_score + ", " + g.home + " " + g.home_score })]));
+    card.addEventListener("click", () => { setMatch(g.home, g.away, g.neutral); show("matchup"); history.replaceState(null, "", "#matchup"); window.scrollTo(0, 0); });
+    slate.appendChild(card);
+  });
+
+  // ---------- matchup ----------
+  const $ = id => document.getElementById(id);
+  const state = { home: null, away: null, neutral: false, miss: {} };
+  ["home", "away"].forEach(s => TEAMS.forEach(t => $(s).appendChild(el("option", { value: t, text: t }))));
+  $("pick").appendChild(el("option", { value: "", text: "Pick a scheduled game…" }));
+  let wk = null, grp = null;
+  DATA.schedule.forEach((g, i) => {
+    if (g.week !== wk) { wk = g.week; grp = el("optgroup", { label: "Week " + wk }); $("pick").appendChild(grp); }
+    grp.appendChild(el("option", { value: String(i), text: g.away + " at " + g.home }));
+  });
+  function reportMiss(team) {
+    const m = DATA.missing[team] || { DB: 0, LB: 0, players: [] };
+    return { DB: m.DB, LB: m.LB, players: m.players };
+  }
+  function setMatch(home, away, neutral) {
+    state.home = home; state.away = away; state.neutral = !!neutral;
+    state.miss = { [home]: reportMiss(home), [away]: reportMiss(away) };
+    $("home").value = home; $("away").value = away; $("neutral").checked = state.neutral;
+    renderInjuries(); renderMatch();
+  }
+  $("pick").addEventListener("change", e => { const g = DATA.schedule[+e.target.value]; if (g) setMatch(g.home, g.away, g.neutral); });
+  $("home").addEventListener("change", e => { if (e.target.value === state.away) return; setMatch(e.target.value, state.away, state.neutral); });
+  $("away").addEventListener("change", e => { if (e.target.value === state.home) return; setMatch(state.home, e.target.value, state.neutral); });
+  $("neutral").addEventListener("change", e => { state.neutral = e.target.checked; renderMatch(); });
+
+  function renderInjuries() {
+    [["away", state.away], ["home", state.home]].forEach(([side, team]) => {
+      const box = $("inj-" + side); box.textContent = "";
+      const m = state.miss[team];
+      box.appendChild(el("div", { class: "eyebrow", text: team + " starters missing" }));
+      const inputs = el("div", { class: "inputs" });
+      [["DB", "Defensive backs"], ["LB", "Linebackers"]].forEach(([g, name]) => {
+        const id = "miss-" + side + "-" + g;
+        const inp = el("input", { type: "number", id: id, min: "0", max: g === "DB" ? "5" : "2", step: "0.5", value: (+m[g]).toFixed(2).replace(/\.?0+$/, "") || "0" });
+        inp.addEventListener("input", () => { m[g] = Math.max(0, +inp.value || 0); renderMatch(); });
+        inputs.appendChild(el("div", { class: "field" }, [el("label", { for: id, text: name }), inp]));
+      });
+      box.appendChild(inputs);
+      const who = m.players.length ? m.players.map(p => p.name + " (" + p.status + ")").join(", ") : "No starters on this week's report.";
+      box.appendChild(el("p", { class: "small", text: who }));
+      const reset = el("button", { class: "linkbtn", type: "button", text: "Reset to injury report" });
+      reset.addEventListener("click", () => { state.miss[team] = reportMiss(team); renderInjuries(); renderMatch(); });
+      box.appendChild(reset);
+    });
+  }
+
+  function renderMatch() {
+    const { home, away, neutral } = state;
+    const r = predict(home, away, neutral, state.miss[home], state.miss[away]);
+    const board = $("board"); board.textContent = "";
+    board.setAttribute("aria-label", "Projected score: " + away + " " + r.ap.toFixed(1) + ", " + home + " " + r.hp.toFixed(1));
+    board.append(
+      el("div", { class: "team" }, [el("span", { class: "abbr away", text: away }), el("span", { class: "pts", text: Math.round(r.ap) }), el("span", { class: "sub", text: r.ap.toFixed(1) + " · wins " + pct(1 - r.wp) })]),
+      el("div", { class: "mid", text: neutral ? "Projected score · neutral site" : "Projected score" }),
+      el("div", { class: "team r" }, [el("span", { class: "abbr home", text: home }), el("span", { class: "pts", text: Math.round(r.hp) }), el("span", { class: "sub", text: r.hp.toFixed(1) + " · wins " + pct(r.wp) })]));
+    let hb7 = 0, ab7 = 0;
+    K.forEach((k, i) => { if (k >= 7) hb7 += r.p[i]; if (k <= -7) ab7 += r.p[i]; });
+    const facts = $("facts"); facts.textContent = "";
+    [[pct(Math.max(r.wp, 1 - r.wp)), (r.wp >= 0.5 ? home : away) + " wins"],
+     [sgn(r.m), home + " margin"],
+     [r.t.toFixed(1), "Total points"],
+     [pct(hb7) + " / " + pct(ab7), home + " / " + away + " by 7+"]].forEach(([v, l]) =>
+      facts.appendChild(el("div", { class: "fact" }, [el("span", { class: "v", text: v }), el("span", { class: "l", text: l })])));
+    drawDist(r, home, away);
+    renderLevers(r, home, away);
+  }
+
+  function drawDist(r, home, away) {
+    const lg = $("dist-legend"); lg.textContent = "";
+    lg.append(el("span", {}, [el("i", { class: "sw", style: "background:var(--away)" }), away + " wins"]),
+              el("span", {}, [el("i", { class: "sw", style: "background:var(--home)" }), home + " wins"]));
+    const box = $("dist"); box.textContent = "";
+    const W = Math.max(300, box.clientWidth), H = W < 520 ? 220 : 260, m = { t: 10, r: 6, b: 38, l: 38 };
+    const lo = -35, hi = 35, n = hi - lo + 1, iw = W - m.l - m.r, ih = H - m.t - m.b, bw = iw / n;
+    const vals = []; for (let k = lo; k <= hi; k++) vals.push(r.p[k - KMIN]);
+    const ymax = Math.max(0.04, Math.ceil(Math.max(...vals) * 100 + 0.5) / 100);
+    const svg = sv("svg", { viewBox: "0 0 " + W + " " + H, width: W, height: H, role: "img", "aria-label": "Probability of each final margin, " + home + " perspective" }, box);
+    const y = v => m.t + ih - (v / ymax) * ih;
+    const step = ymax > 0.08 ? 0.02 : 0.01;
+    for (let v = 0; v <= ymax + 1e-9; v += step) {
+      sv("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: "var(--rule)", "stroke-width": 1 }, svg);
+      sv("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = Math.round(v * 100) + "%";
+    }
+    const tip = el("div", { class: "tip" }); tip.hidden = true; box.appendChild(tip);
+    vals.forEach((v, i) => {
+      const k = lo + i, x = m.l + i * bw + 1, w = Math.max(1, bw - 2), hgt = Math.max(0.5, (v / ymax) * ih), yt = m.t + ih - hgt;
+      const rr = Math.min(3, w / 2, hgt);
+      const fill = k > 0 ? "var(--home)" : k < 0 ? "var(--away)" : "var(--ink-3)";
+      const bar = sv("path", { fill: fill, d: "M" + x + "," + (m.t + ih) + "V" + (yt + rr) + "Q" + x + "," + yt + " " + (x + rr) + "," + yt + "H" + (x + w - rr) + "Q" + (x + w) + "," + yt + " " + (x + w) + "," + (yt + rr) + "V" + (m.t + ih) + "Z" }, svg);
+      const hit = sv("rect", { x: m.l + i * bw, y: m.t, width: bw, height: ih, fill: "transparent", tabindex: k % 7 === 0 || k === 3 || k === -3 ? 0 : -1,
+        "aria-label": (k === 0 ? "Tie" : (k > 0 ? home : away) + " by " + Math.abs(k)) + ": " + pct(v, 1) }, svg);
+      const on = () => {
+        tip.textContent = "";
+        tip.append(el("b", { text: pct(v, 1) }), " " + (k === 0 ? "tie after overtime" : (k > 0 ? home : away) + " by " + Math.abs(k)));
+        tip.hidden = false;
+        const cx = m.l + (i + 0.5) * bw, tw = tip.offsetWidth;
+        tip.style.left = Math.min(Math.max(0, cx - tw / 2), W - tw) + "px"; tip.style.top = "-6px";
+        bar.setAttribute("opacity", "0.75");
+      };
+      const off = () => { tip.hidden = true; bar.removeAttribute("opacity"); };
+      hit.addEventListener("mouseenter", on); hit.addEventListener("focus", on);
+      hit.addEventListener("mouseleave", off); hit.addEventListener("blur", off);
+      hit.addEventListener("touchstart", on, { passive: true });
+    });
+    sv("line", { x1: m.l, x2: W - m.r, y1: m.t + ih, y2: m.t + ih, stroke: "var(--ink-3)", "stroke-width": 1 }, svg);
+    (W < 520 ? [-28, -14, 0, 14, 28] : [-28, -21, -14, -7, 0, 7, 14, 21, 28]).forEach(k => {
+      sv("text", { x: m.l + (k - lo + 0.5) * bw, y: m.t + ih + 16, "text-anchor": "middle" }, svg).textContent = k === 0 ? "0" : (k > 0 ? home + " " : away + " ") + Math.abs(k);
+    });
+    sv("text", { x: m.l + iw / 2, y: H - 4, "text-anchor": "middle" }, svg).textContent = "Final margin (points)";
+    let c = 0, q = {};
+    K.forEach((k, i) => { c += r.p[i]; [0.25, 0.75].forEach(x => { if (q[x] === undefined && c >= x) q[x] = k; }); });
+    const side = k => k === 0 ? "even" : (k > 0 ? home : away) + " by " + Math.abs(k);
+    $("dist-note").textContent = "Middle half of outcomes: " + side(q[0.25]) + " to " + side(q[0.75]) +
+      ". The spikes at 3 and 7 are real: games end on field goals and touchdowns far more often than a smooth curve says.";
+  }
+
+  function renderLevers(r, home, away) {
+    const f = $("focus"); const keep = f.value;
+    f.textContent = "";
+    [home, away].forEach(t => f.appendChild(el("option", { value: t, text: t })));
+    f.value = keep === away ? away : home;
+    const team = f.value, opp = team === home ? away : home;
+    const myM = team === home ? r.m : -r.m, myPts = team === home ? r.hp : r.ap, oppPts = team === home ? r.ap : r.hp;
+    const base = winProb(myM), c = P.lever_coef;
+    const lv = $("levers"); lv.textContent = "";
+    lv.appendChild(el("thead", {}, [el("tr", {}, [el("th", { text: "One more…" }), el("th", { text: "Points" }), el("th", { text: team + " wins" })])]));
+    const tb = el("tbody");
+    [["Takeaway", c.takeaways - c.giveaways], ["Giveaway avoided", c.takeaways - c.giveaways], ["Sack made", c.sacks_made - c.sacks_taken],
+     ["Sack avoided", c.sacks_made - c.sacks_taken], ["Explosive play", c.expl_for - c.expl_against]].forEach(([name, v]) => {
+      const w = winProb(myM + v);
+      tb.appendChild(el("tr", {}, [el("td", { text: name }), el("td", { class: "num", text: sgn(v) }),
+        el("td", { class: "num" }, [pct(w) + " ", el("span", { class: "pos", text: "(+" + ((w - base) * 100).toFixed(1) + ")" })])]));
+    });
+    lv.appendChild(tb);
+    const sc = $("scen"); sc.textContent = "";
+    sc.appendChild(el("thead", {}, [el("tr", {}, [el("th", { text: team + " upside" }), el("th", { text: "Score" }), el("th", { text: "Wins" }), el("th", { text: "Happens" })])]));
+    const sb = el("tbody");
+    sb.appendChild(el("tr", {}, [el("td", { text: "Projection" }), el("td", { class: "num", text: Math.round(myPts) + "–" + Math.round(oppPts) }), el("td", { class: "num", text: pct(base) }), el("td", { text: "—" })]));
+    Object.entries(P.scenarios).forEach(([name, cond]) => {
+      const [me, op] = scenarioShift(cond);
+      const a = myPts + me, b = oppPts + op;
+      sb.appendChild(el("tr", {}, [el("td", { text: name, title: Object.entries(cond).map(([k, v]) => k.replace("_", " ") + (GOOD_HIGH[k] ? " ≥ " : " ≤ ") + v).join(", ") }),
+        el("td", { class: "num", text: Math.round(a) + "–" + Math.round(b) }), el("td", { class: "num", text: pct(winProb(a - b, P.sd_margin_given_levers)) }),
+        el("td", { class: "num", text: "1 in " + Math.round(1 / P.scenario_freq[name]) })]));
+    });
+    sc.appendChild(sb);
+  }
+  $("focus").addEventListener("change", () => renderMatch());
+
+  // ---------- record ----------
+  const rec = DATA.record, sr = $("season-record");
+  if (!rec.summary || !rec.summary.games) {
+    sr.appendChild(el("div", { class: "empty", text: "No graded games yet. Predictions are logged before each kickoff (Tue, Thu and Sat runs) and graded once final scores are in, so this fills in from Week " + DATA.meta.week + " on." }));
+  } else {
+    const s = rec.summary, tiles = el("div", { class: "tiles" });
+    [[String(s.games), "Games graded"], [pct(s.winner_pct), "Picked the winner"], [s.brier.toFixed(3), "Brier (home-rate baseline " + s.home_rate_brier.toFixed(3) + ")"],
+     [s.mae_margin.toFixed(1), "Avg margin miss (pts)"]].forEach(([v, l]) => tiles.appendChild(el("div", { class: "fact" }, [el("span", { class: "v", text: v }), el("span", { class: "l", text: l })])));
+    sr.appendChild(tiles);
+    const t = el("table"), tb = el("tbody");
+    t.appendChild(el("thead", {}, [el("tr", {}, ["Week", "Game", "Predicted", "Final", "Home win %", "Brier"].map(h => el("th", { text: h })))]));
+    rec.games.forEach(g => tb.appendChild(el("tr", {}, [el("td", { text: String(g.week) }), el("td", { text: g.away + " at " + g.home }),
+      el("td", { class: "num", text: g.away_pts.toFixed(0) + "–" + g.home_pts.toFixed(0) }), el("td", { class: "num", text: g.away_score + "–" + g.home_score }),
+      el("td", { class: "num", text: pct(g.home_wp) }), el("td", { class: "num", text: g.brier.toFixed(3) })])));
+    t.appendChild(tb); sr.appendChild(el("div", { class: "tw" }, [t]));
+  }
+  const bt = DATA.backtest;
+  $("bt-note").textContent = "Replaying " + bt.games.toLocaleString() + " games week by week since 2022, using only what was known before each kickoff. Each season's calibration was fit on the other seasons.";
+  [[pct(bt.model.winner_pct), "Picked the winner (always-home " + pct(bt.always_home.winner_pct) + ")"], [bt.model.brier.toFixed(3), "Brier (always-home " + bt.always_home.brier.toFixed(3) + ")"],
+   [bt.model.mae_margin.toFixed(1), "Avg margin miss (pts)"], [bt.model.mae_total.toFixed(1), "Avg total miss (pts)"]]
+    .forEach(([v, l]) => $("bt-tiles").appendChild(el("div", { class: "fact" }, [el("span", { class: "v", text: v }), el("span", { class: "l", text: l })])));
+  const bs = $("by-season");
+  bs.appendChild(el("thead", {}, [el("tr", {}, ["Season", "Games", "Brier", "Margin miss"].map(h => el("th", { text: h })))]));
+  const bsb = el("tbody");
+  Object.entries(bt.by_season).forEach(([s, v]) => bsb.appendChild(el("tr", {}, [el("td", { text: s }), el("td", { class: "num", text: String(v.games) }), el("td", { class: "num", text: v.brier.toFixed(3) }), el("td", { class: "num", text: v.mae_margin.toFixed(1) })])));
+  bs.appendChild(bsb);
+
+  function drawCalib() {
+    const box = $("calib"); box.textContent = "";
+    const W = Math.max(260, box.clientWidth), H = Math.min(320, W), m = { t: 10, r: 10, b: 38, l: 42 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const svg = sv("svg", { viewBox: "0 0 " + W + " " + H, width: W, height: H, role: "img", "aria-label": "Predicted versus actual home win rate" }, box);
+    const x = v => m.l + v * iw, y = v => m.t + ih - v * ih;
+    [0, 0.25, 0.5, 0.75, 1].forEach(v => {
+      sv("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: "var(--rule)", "stroke-width": 1 }, svg);
+      sv("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end" }, svg).textContent = pct(v);
+      sv("text", { x: x(v), y: m.t + ih + 16, "text-anchor": "middle" }, svg).textContent = pct(v);
+    });
+    sv("line", { x1: x(0), y1: y(0), x2: x(1), y2: y(1), stroke: "var(--ink-3)", "stroke-width": 1.5, "stroke-dasharray": "4 4" }, svg);
+    sv("text", { x: m.l + iw / 2, y: H - 4, "text-anchor": "middle" }, svg).textContent = "Predicted home win chance";
+    const tip = el("div", { class: "tip" }); tip.hidden = true; box.appendChild(tip);
+    bt.calibration.forEach(c => {
+      const r = Math.max(5, Math.min(14, Math.sqrt(c.games) * 0.7));
+      sv("circle", { cx: x(c.predicted), cy: y(c.actual), r: r + 2, fill: "var(--surface)" }, svg);
+      const dot = sv("circle", { cx: x(c.predicted), cy: y(c.actual), r: r, fill: "var(--home)" }, svg);
+      const hit = sv("circle", { cx: x(c.predicted), cy: y(c.actual), r: Math.max(14, r + 4), fill: "transparent", tabindex: 0,
+        "aria-label": c.games + " games: predicted " + pct(c.predicted) + ", actual " + pct(c.actual) }, svg);
+      const on = () => { tip.textContent = ""; tip.append(el("b", { text: pct(c.actual) }), " won when predicted " + pct(c.predicted) + " · " + c.games + " games"); tip.hidden = false;
+        tip.style.left = Math.min(Math.max(0, x(c.predicted) - tip.offsetWidth / 2), W - tip.offsetWidth) + "px"; tip.style.top = Math.max(0, y(c.actual) - 44) + "px"; dot.setAttribute("opacity", "0.75"); };
+      const off = () => { tip.hidden = true; dot.removeAttribute("opacity"); };
+      hit.addEventListener("mouseenter", on); hit.addEventListener("focus", on); hit.addEventListener("mouseleave", off); hit.addEventListener("blur", off);
+    });
+  }
+
+  // ---------- ratings ----------
+  const avgPace = TEAMS.reduce((a, t) => a + T[t].pace, 0) / TEAMS.length;
+  const avgPr = TEAMS.reduce((a, t) => a + T[t].pass_rate, 0) / TEAMS.length;
+  T.__AVG = { off_pass: 0, def_pass: 0, off_rush: 0, def_rush: 0, pace: avgPace, pass_rate: avgPr };
+  const rows = TEAMS.map(t => {
+    const net = P.calibration.m_slope * (points(t, "__AVG", 0, [0, 0]) - points("__AVG", t, 0, [0, 0]));
+    return { team: t, net: net, off_pass: T[t].off_pass, off_rush: T[t].off_rush, def_pass: -T[t].def_pass, def_rush: -T[t].def_rush, pace: T[t].pace };
+  });
+  const cols = [["team", "Team"], ["net", "Net pts"], ["off_pass", "Off pass"], ["off_rush", "Off rush"], ["def_pass", "Def pass"], ["def_rush", "Def rush"], ["pace", "Plays/gm"]];
+  let sortKey = "net";
+  function renderRatings() {
+    const t = $("ratings"); t.textContent = "";
+    const tr = el("tr");
+    tr.appendChild(el("th", { text: "#" }));
+    cols.forEach(([k, name]) => {
+      const b = el("button", { type: "button", text: name });
+      if (k === sortKey) b.setAttribute("aria-sort", "descending");
+      b.addEventListener("click", () => { sortKey = k; renderRatings(); });
+      tr.appendChild(el("th", {}, [b]));
+    });
+    t.appendChild(el("thead", {}, [tr]));
+    const sorted = rows.slice().sort((a, b) => sortKey === "team" ? a.team.localeCompare(b.team) : b[sortKey] - a[sortKey]);
+    const tb = el("tbody");
+    sorted.forEach((r, i) => tb.appendChild(el("tr", {}, [el("td", { class: "num", text: String(i + 1) }), el("td", { class: "strong", text: r.team }),
+      el("td", { class: "num strong", text: sgn(r.net) }), ...["off_pass", "off_rush", "def_pass", "def_rush"].map(k => el("td", { class: "num", text: (r[k] >= 0 ? "+" : "−") + Math.abs(r[k]).toFixed(3) })),
+      el("td", { class: "num", text: r.pace.toFixed(1) })])));
+    t.appendChild(tb);
+  }
+
+  // ---------- self-check: the page's math must match the Python engine ----------
+  let worst = 0;
+  DATA.slate.forEach(g => {
+    const r = predict(g.home, g.away, g.neutral, DATA.missing[g.home], DATA.missing[g.away]);
+    worst = Math.max(worst, Math.abs(r.hp - g.home_pts), Math.abs(r.ap - g.away_pts), Math.abs(r.wp - g.home_wp) * 100);
+  });
+  window.__selfcheck = worst;
+  if (worst > 0.05) console.warn("Dashboard math differs from the Python engine by " + worst.toFixed(3));
+
+  // ---------- boot ----------
+  const first = DATA.slate[0] || { home: TEAMS[0], away: TEAMS[1], neutral: false };
+  setMatch(first.home, first.away, first.neutral);
+  renderRatings(); drawCalib();
+  let start = (location.hash || "").slice(1);
+  if (!tabs.includes(start)) { try { start = localStorage.getItem("gm-tab") || "week"; } catch (e) { start = "week"; } }
+  show(tabs.includes(start) ? start : "week");
+  let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { renderMatch(); drawCalib(); }, 150); });
+  document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => setTimeout(() => { renderMatch(); drawCalib(); }, 0)));
+})();
+</script>
