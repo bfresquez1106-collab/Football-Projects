@@ -50,7 +50,7 @@ went well under 40.5.
 - **The tested injury adjustments beat the judgement calls** on margin and Brier score. That's
   the right direction, but one game can't prove it.
 - **Overtime pushed the margin onto 3.** 57% of overtime games since 2016 ended by exactly 3,
-  and the key-number distribution put 7.6% on DEN by exactly 3, against 2.7% for a plain normal.
+  and the key-number distribution put 7.6% on DEN by exactly 3, against 2.9% for a plain normal.
 - **The total missed by 9–10 points for everyone.** Historically lines slightly under-price wind
   (calm games: +1.5 pts over the line; 10+ mph: −1.5). Weather isn't in nflverse for this game
   yet, but wind is a candidate feature for the total.
