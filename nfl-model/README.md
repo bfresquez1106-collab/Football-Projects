@@ -42,6 +42,27 @@ built and tested on one game.
 Each season is scored with calibration fit on the other seasons, so the scorecard isn't grading
 its own answers. The season-by-season Brier score holds steady at 0.220–0.235.
 
+## The Elo benchmark
+
+Every game is also predicted by Elo (`nflmodel/elo.py`): one rating per team, updated from
+final scores, with settings frozen at the values tuned on 2002–2021 in
+[elo-model](../elo-model/). It's the bar Gridiron has to clear, and right now it's ahead
+(replay Brier 0.223 vs 0.228). Both models are logged before every kickoff and graded on the
+same games, so the Record tab shows the live head-to-head.
+
+The Ratings tab groups teams into **Elo tiers** by field position, using fixed lines on the
+chance of beating an average team on a neutral field:
+
+| Tier | Medal | Elo vs average | Beats an average team |
+|---|---|---|---|
+| Red Zone | gold | +100 or more | 64%+ |
+| Field Goal Range | silver | +35 to +100 | 55–64% |
+| Midfield | bronze | −35 to +35 | 45–55% |
+| Backed Up | — | below −35 | under 45% |
+
+Fixed lines mean tier sizes change with the league: a season with three great teams has three
+teams in the Red Zone, not a fixed eight.
+
 ## The rules this model follows
 
 - **No betting lines.** `nflmodel/data.py` drops every line and odds column at load.

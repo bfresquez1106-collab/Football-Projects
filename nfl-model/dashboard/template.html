@@ -20,6 +20,9 @@
   --board-ink: #F3F5F8;
   --board-dim: #9AA6BF;
   --good: #2F7D4F;
+  --gold: #B7871F;
+  --silver: #8C96A8;
+  --bronze: #A86532;
   --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -28,13 +31,13 @@
   :root:not([data-theme="light"]) {
     --bg: #0B1220; --surface: #121B2D; --ink: #E8ECF3; --ink-2: #B4BDCE; --ink-3: #8792A8;
     --rule: #26324A; --wash: #1A2438; --accent: #E0682E; --home: #E0682E; --away: #5F86CF;
-    --board: #18233A; --board-ink: #F3F5F8; --board-dim: #9AA6BF; --good: #5DB07F; color-scheme: dark;
+    --board: #18233A; --board-ink: #F3F5F8; --board-dim: #9AA6BF; --good: #5DB07F; --gold: #D9A93A; --silver: #A9B3C4; --bronze: #C7814A; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0B1220; --surface: #121B2D; --ink: #E8ECF3; --ink-2: #B4BDCE; --ink-3: #8792A8;
   --rule: #26324A; --wash: #1A2438; --accent: #E0682E; --home: #E0682E; --away: #5F86CF;
-  --board: #18233A; --board-ink: #F3F5F8; --board-dim: #9AA6BF; --good: #5DB07F; color-scheme: dark;
+  --board: #18233A; --board-ink: #F3F5F8; --board-dim: #9AA6BF; --good: #5DB07F; --gold: #D9A93A; --silver: #A9B3C4; --bronze: #C7814A; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -75,6 +78,23 @@ main { padding-block: 24px 64px; }
 .split { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 2px; background: var(--surface); }
 .split i { display: block; height: 100%; }
 .final { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+.elo-line { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+.elo-line b { color: var(--ink-2); font-weight: 600; }
+.tiers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tier { background: var(--surface); border: 1px solid var(--rule); border-top: 4px solid var(--rule); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.tier[data-medal="gold"] { border-top-color: var(--gold); }
+.tier[data-medal="silver"] { border-top-color: var(--silver); }
+.tier[data-medal="bronze"] { border-top-color: var(--bronze); }
+.tier h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.tier .medal { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.tier ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.tier li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--rule); font-variant-numeric: tabular-nums; }
+.tier li .t { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: 0.04em; }
+.tier li .r { font-family: var(--mono); font-size: 13px; color: var(--ink-2); }
+.tier li .d { font-family: var(--mono); font-size: 12px; color: var(--ink-3); text-align: right; }
+.tier li .d.up { color: var(--good); }
+@media (max-width: 860px) { .tiers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .tiers { grid-template-columns: 1fr; } }
 .final b { color: var(--ink); }
 
 /* Matchup */
@@ -117,6 +137,7 @@ input[type="number"] { width: 84px; }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; font-variant-numeric: tabular-nums; }
 th:first-child, td:first-child { text-align: left; }
+#ratings th:nth-child(2), #ratings td:nth-child(2) { text-align: left; }
 th { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
 th button { all: unset; cursor: pointer; }
 th button[aria-sort]::after { content: " ↓"; }
@@ -167,6 +188,7 @@ td.strong, td:first-child { color: var(--ink); font-weight: 500; }
       </div>
     </div>
     <div class="board" id="board" role="img"></div>
+    <p class="small" id="elo-note"></p>
     <div class="facts" id="facts"></div>
     <div class="section">
       <h3>Final margin</h3>
@@ -192,11 +214,13 @@ td.strong, td:first-child { color: var(--ink); font-weight: 500; }
       <h2>This season's record</h2>
       <p class="muted">Each game is graded on the last prediction logged before kickoff. Brier score is the squared gap between the win probability and what happened: 0 is perfect, and 0.25 is a coin flip.</p>
       <div id="season-record"></div>
+      <div id="h2h"></div>
     </div>
     <div class="section">
       <h2>Track record in the replay</h2>
       <p class="muted" id="bt-note"></p>
       <div class="tiles" id="bt-tiles"></div>
+      <div class="tw"><table id="bt-h2h"></table></div>
       <div class="two">
         <div class="section">
           <h3>Calibration</h3>
@@ -212,6 +236,11 @@ td.strong, td:first-child { color: var(--ink); font-weight: 500; }
   </section>
 
   <section class="panel" id="p-ratings" role="tabpanel" aria-labelledby="tab-ratings" hidden>
+    <div class="section">
+      <h2>Elo tiers</h2>
+      <p class="muted">The Elo benchmark, grouped by field position. Each line is a fixed chance of beating an average team on a neutral field, so a tier holds as many teams as have earned it. The arrow is the change since last week.</p>
+      <div class="tiers" id="tiers"></div>
+    </div>
     <div class="section">
       <h2>Team ratings</h2>
       <p class="muted">Opponent-adjusted EPA per play against an average team; positive is good on both sides of the ball. Net is the predicted margin against an average team on a neutral field.</p>
@@ -229,6 +258,12 @@ const DATA = /*__DATA__*/null;
   const KMIN = P.k_min, KW = P.key_weights, K = KW.map((_, i) => KMIN + i);
   const LEVERS = ["takeaways", "giveaways", "sacks_made", "sacks_taken", "expl_for", "expl_against"];
   const MIRROR = { takeaways: "giveaways", giveaways: "takeaways", sacks_made: "sacks_taken", sacks_taken: "sacks_made", expl_for: "expl_against", expl_against: "expl_for" };
+  const E = DATA.elo;
+  const eloAvg = Object.values(E.ratings).reduce((a, b) => a + b, 0) / Object.keys(E.ratings).length;
+  function eloProb(home, away, neutral) {
+    const gap = E.ratings[home] + (neutral ? 0 : E.hfa) - E.ratings[away];
+    return 1 / (1 + Math.pow(10, -gap / 400));
+  }
   const GOOD_HIGH = { takeaways: true, giveaways: false, sacks_made: true, sacks_taken: false, expl_for: true, expl_against: false };
 
   // ---------- math: mirrors nflmodel/ratings.py and engine.py ----------
@@ -334,6 +369,8 @@ const DATA = /*__DATA__*/null;
         el("i", { style: "width:" + ((1 - g.home_wp) * 100).toFixed(1) + "%;background:var(--away)" }),
         el("i", { style: "width:" + (g.home_wp * 100).toFixed(1) + "%;background:var(--home)" })])
     ]);
+    const ep = g.elo_wp, eFav = ep >= 0.5 ? g.home : g.away;
+    card.appendChild(el("div", { class: "elo-line" }, ["Elo benchmark: ", el("b", { text: eFav + " " + pct(Math.max(ep, 1 - ep)) })]));
     if (g.played) card.appendChild(el("div", { class: "final" }, ["Final: ", el("b", { text: g.away + " " + g.away_score + ", " + g.home + " " + g.home_score })]));
     card.addEventListener("click", () => { setMatch(g.home, g.away, g.neutral); show("matchup"); history.replaceState(null, "", "#matchup"); window.scrollTo(0, 0); });
     slate.appendChild(card);
@@ -402,6 +439,9 @@ const DATA = /*__DATA__*/null;
      [r.t.toFixed(1), "Total points"],
      [pct(hb7) + " / " + pct(ab7), home + " / " + away + " by 7+"]].forEach(([v, l]) =>
       facts.appendChild(el("div", { class: "fact" }, [el("span", { class: "v", text: v }), el("span", { class: "l", text: l })])));
+    const ep = eloProb(home, away, neutral), eFav = ep >= 0.5 ? home : away;
+    $("elo-note").textContent = "Elo benchmark: " + eFav + " wins " + pct(Math.max(ep, 1 - ep)) +
+      ". Elo only sees final scores, so the injury inputs don't move it; the gap between the two models is the extra information Gridiron uses.";
     drawDist(r, home, away);
     renderLevers(r, home, away);
   }
@@ -498,12 +538,28 @@ const DATA = /*__DATA__*/null;
      [s.mae_margin.toFixed(1), "Avg margin miss (pts)"]].forEach(([v, l]) => tiles.appendChild(el("div", { class: "fact" }, [el("span", { class: "v", text: v }), el("span", { class: "l", text: l })])));
     sr.appendChild(tiles);
     const t = el("table"), tb = el("tbody");
-    t.appendChild(el("thead", {}, [el("tr", {}, ["Week", "Game", "Predicted", "Final", "Home win %", "Brier"].map(h => el("th", { text: h })))]));
+    t.appendChild(el("thead", {}, [el("tr", {}, ["Week", "Game", "Predicted", "Final", "Home win %", "Elo home %", "Brier"].map(h => el("th", { text: h })))]));
     rec.games.forEach(g => tb.appendChild(el("tr", {}, [el("td", { text: String(g.week) }), el("td", { text: g.away + " at " + g.home }),
       el("td", { class: "num", text: g.away_pts.toFixed(0) + "–" + g.home_pts.toFixed(0) }), el("td", { class: "num", text: g.away_score + "–" + g.home_score }),
-      el("td", { class: "num", text: pct(g.home_wp) }), el("td", { class: "num", text: g.brier.toFixed(3) })])));
+      el("td", { class: "num", text: pct(g.home_wp) }), el("td", { class: "num", text: g.elo_wp == null || isNaN(g.elo_wp) ? "—" : pct(g.elo_wp) }),
+      el("td", { class: "num", text: g.brier.toFixed(3) })])));
     t.appendChild(tb); sr.appendChild(el("div", { class: "tw" }, [t]));
   }
+  function h2hTable(table, rows) {
+    table.textContent = "";
+    table.appendChild(el("thead", {}, [el("tr", {}, ["Model", "Games", "Brier", "Log loss", "Picked winner"].map(h => el("th", { text: h })))]));
+    const b = el("tbody");
+    const best = Math.min(...rows.map(r => r[1].brier));
+    rows.forEach(([name, s]) => b.appendChild(el("tr", {}, [el("td", { text: name + (s.brier === best ? "  ★ leads" : "") }), el("td", { class: "num", text: String(s.games) }),
+      el("td", { class: "num", text: s.brier.toFixed(3) }), el("td", { class: "num", text: s.log_loss.toFixed(3) }), el("td", { class: "num", text: pct(s.winner_pct, 1) })])));
+    table.appendChild(b);
+  }
+  if (rec.summary && rec.summary.head_to_head) {
+    const t = el("table");
+    $("h2h").append(el("h3", { text: "Gridiron vs the Elo benchmark, this season" }), el("div", { class: "tw" }, [t]));
+    h2hTable(t, [["Gridiron", rec.summary.head_to_head.gridiron], ["Elo benchmark", rec.summary.head_to_head.elo]]);
+  }
+  h2hTable($("bt-h2h"), [["Gridiron", E.backtest.gridiron], ["Elo benchmark", E.backtest.elo]]);
   const bt = DATA.backtest;
   $("bt-note").textContent = "Replaying " + bt.games.toLocaleString() + " games week by week since 2022, using only what was known before each kickoff. Each season's calibration was fit on the other seasons.";
   [[pct(bt.model.winner_pct), "Picked the winner (always-home " + pct(bt.always_home.winner_pct) + ")"], [bt.model.brier.toFixed(3), "Brier (always-home " + bt.always_home.brier.toFixed(3) + ")"],
@@ -541,15 +597,37 @@ const DATA = /*__DATA__*/null;
     });
   }
 
+  // ---------- Elo tiers ----------
+  (function renderTiers() {
+    const box = $("tiers");
+    const teams = Object.keys(E.ratings).map(t => ({ t: t, r: E.ratings[t] - eloAvg, d: E.ratings[t] - E.prev[t] })).sort((a, b) => b.r - a.r);
+    E.tiers.forEach((tr, i) => {
+      const lo = tr.floor, hi = i === 0 ? Infinity : E.tiers[i - 1].floor;
+      const members = teams.filter(x => x.r >= lo && x.r < hi);
+      const card = el("div", { class: "tier", "data-medal": tr.medal || "none" });
+      card.appendChild(el("h3", {}, [tr.name, el("span", { class: "medal", text: (tr.medal || "unranked") + " · " + members.length })]));
+      card.appendChild(el("p", { class: "small", text: tr.means }));
+      const ol = el("ol");
+      members.forEach(x => {
+        const arrow = Math.abs(x.d) < 0.5 ? "–" : (x.d > 0 ? "▲ " : "▼ ") + Math.abs(x.d).toFixed(0);
+        ol.appendChild(el("li", {}, [el("span", { class: "t", text: x.t }), el("span", { class: "r", text: (x.r >= 0 ? "+" : "−") + Math.abs(x.r).toFixed(0) + " Elo" }),
+          el("span", { class: "d" + (x.d >= 0.5 ? " up" : ""), text: arrow, "aria-label": "change since last week " + x.d.toFixed(0) })]));
+      });
+      if (!members.length) ol.appendChild(el("li", {}, [el("span", { class: "r", text: "No teams this week" })]));
+      card.appendChild(ol);
+      box.appendChild(card);
+    });
+  })();
+
   // ---------- ratings ----------
   const avgPace = TEAMS.reduce((a, t) => a + T[t].pace, 0) / TEAMS.length;
   const avgPr = TEAMS.reduce((a, t) => a + T[t].pass_rate, 0) / TEAMS.length;
   T.__AVG = { off_pass: 0, def_pass: 0, off_rush: 0, def_rush: 0, pace: avgPace, pass_rate: avgPr };
   const rows = TEAMS.map(t => {
     const net = P.calibration.m_slope * (points(t, "__AVG", 0, [0, 0]) - points("__AVG", t, 0, [0, 0]));
-    return { team: t, net: net, off_pass: T[t].off_pass, off_rush: T[t].off_rush, def_pass: -T[t].def_pass, def_rush: -T[t].def_rush, pace: T[t].pace };
+    return { team: t, net: net, elo: E.ratings[t] - eloAvg, off_pass: T[t].off_pass, off_rush: T[t].off_rush, def_pass: -T[t].def_pass, def_rush: -T[t].def_rush, pace: T[t].pace };
   });
-  const cols = [["team", "Team"], ["net", "Net pts"], ["off_pass", "Off pass"], ["off_rush", "Off rush"], ["def_pass", "Def pass"], ["def_rush", "Def rush"], ["pace", "Plays/gm"]];
+  const cols = [["team", "Team"], ["net", "Net pts"], ["elo", "Elo"], ["off_pass", "Off pass"], ["off_rush", "Off rush"], ["def_pass", "Def pass"], ["def_rush", "Def rush"], ["pace", "Plays/gm"]];
   let sortKey = "net";
   function renderRatings() {
     const t = $("ratings"); t.textContent = "";
@@ -565,7 +643,7 @@ const DATA = /*__DATA__*/null;
     const sorted = rows.slice().sort((a, b) => sortKey === "team" ? a.team.localeCompare(b.team) : b[sortKey] - a[sortKey]);
     const tb = el("tbody");
     sorted.forEach((r, i) => tb.appendChild(el("tr", {}, [el("td", { class: "num", text: String(i + 1) }), el("td", { class: "strong", text: r.team }),
-      el("td", { class: "num strong", text: sgn(r.net) }), ...["off_pass", "off_rush", "def_pass", "def_rush"].map(k => el("td", { class: "num", text: (r[k] >= 0 ? "+" : "−") + Math.abs(r[k]).toFixed(3) })),
+      el("td", { class: "num strong", text: sgn(r.net) }), el("td", { class: "num", text: (r.elo >= 0 ? "+" : "−") + Math.abs(r.elo).toFixed(0) }), ...["off_pass", "off_rush", "def_pass", "def_rush"].map(k => el("td", { class: "num", text: (r[k] >= 0 ? "+" : "−") + Math.abs(r[k]).toFixed(3) })),
       el("td", { class: "num", text: r.pace.toFixed(1) })])));
     t.appendChild(tb);
   }
