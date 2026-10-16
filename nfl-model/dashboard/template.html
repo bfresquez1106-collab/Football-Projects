@@ -215,6 +215,16 @@ td.strong, td:first-child { color: var(--ink); font-weight: 500; }
       <div id="season-record"></div>
       <div id="h2h"></div>
     </div>
+    <div class="section" id="rc-section">
+      <h2 id="rc-h">Earlier weeks, reconstructed</h2>
+      <p class="muted">These games were played before predictions were being logged, so they come from the walk-forward replay: each game was predicted using only games played before its week. The data had no hindsight, but some model settings were chosen while these weeks were visible, so treat this as close to honest rather than a true live record. It's kept separate from the live record above. A tie counts as half a correct pick.</p>
+      <div class="tw"><table id="rc-h2h"></table></div>
+      <div class="tw"><table id="rc-weeks"></table></div>
+      <details>
+        <summary id="rc-sum">Every game</summary>
+        <div class="tw"><table id="rc-games"></table></div>
+      </details>
+    </div>
     <div class="section">
       <h2>Track record in the replay</h2>
       <p class="muted" id="bt-note"></p>
@@ -559,6 +569,43 @@ const DATA = /*__DATA__*/null;
     h2hTable(t, [["Gridiron", rec.summary.head_to_head.gridiron], ["Elo benchmark", rec.summary.head_to_head.elo]]);
   }
   h2hTable($("bt-h2h"), [["Gridiron", E.backtest.gridiron], ["Elo benchmark", E.backtest.elo]]);
+
+  // ---------- earlier weeks, reconstructed ----------
+  (function renderReconstructed() {
+    const rc = rec.reconstructed;
+    if (!rc || !rc.games.length) { $("rc-section").hidden = true; return; }
+    const weeks = [...new Set(rc.games.map(g => g.week))].sort((a, b) => a - b);
+    const span = weeks.length > 1 ? "Weeks " + weeks[0] + "–" + weeks[weeks.length - 1] : "Week " + weeks[0];
+    $("rc-h").textContent = span + ", reconstructed";
+    h2hTable($("rc-h2h"), [["Gridiron", rc.summary.gridiron], ["Elo benchmark", rc.summary.elo]]);
+    const half = x => Math.floor(x) + (x % 1 ? "½" : "");   // a tie counts as half a correct pick
+    const right = (p, g) => g.home_score === g.away_score ? 0.5 : ((p > 0.5) === (g.home_score > g.away_score) ? 1 : 0);
+    // week by week: how many winners each model picked
+    const wt = $("rc-weeks");
+    wt.appendChild(el("thead", {}, [el("tr", {}, ["Week", "Games", "Gridiron picked", "Elo picked"].map(h => el("th", { text: h })))]));
+    const wb = el("tbody");
+    weeks.forEach(w => {
+      const gs = rc.games.filter(g => g.week === w);
+      const gr = gs.reduce((a, g) => a + right(g.home_wp, g), 0), er = gs.reduce((a, g) => a + right(g.elo_wp, g), 0);
+      wb.appendChild(el("tr", {}, [el("td", { text: String(w) }), el("td", { class: "num", text: String(gs.length) }),
+        el("td", { class: "num", text: half(gr) + " of " + gs.length }), el("td", { class: "num", text: half(er) + " of " + gs.length })]));
+    });
+    wt.appendChild(wb);
+    // every game
+    $("rc-sum").textContent = "Every game (" + rc.games.length + ")";
+    const gt = $("rc-games");
+    gt.appendChild(el("thead", {}, [el("tr", {}, ["Week", "Game", "Predicted", "Final", "Gridiron home %", "Elo home %", "Picked the winner"].map(h => el("th", { text: h })))]));
+    const gb = el("tbody");
+    rc.games.forEach(g => {
+      const a = right(g.home_wp, g), b = right(g.elo_wp, g);
+      const who = a === 1 && b === 1 ? "Both" : a === 1 ? "Gridiron" : b === 1 ? "Elo" : a === 0.5 ? "Tie game" : "Neither";
+      gb.appendChild(el("tr", {}, [el("td", { text: String(g.week) }), el("td", { text: g.away + " at " + g.home }),
+        el("td", { class: "num", text: g.away_pts.toFixed(0) + "–" + g.home_pts.toFixed(0) }),
+        el("td", { class: "num", text: g.away_score + "–" + g.home_score }),
+        el("td", { class: "num", text: pct(g.home_wp) }), el("td", { class: "num", text: pct(g.elo_wp) }), el("td", { text: who })]));
+    });
+    gt.appendChild(gb);
+  })();
   const bt = DATA.backtest;
   $("bt-note").textContent = "Replaying " + bt.games.toLocaleString() + " games week by week since 2022, using only what was known before each kickoff. Each season's calibration was fit on the other seasons.";
   [[pct(bt.model.winner_pct), "Picked the winner (always-home " + pct(bt.always_home.winner_pct) + ")"], [bt.model.brier.toFixed(3), "Brier (always-home " + bt.always_home.brier.toFixed(3) + ")"],

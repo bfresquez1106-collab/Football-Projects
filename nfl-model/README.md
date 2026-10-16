@@ -65,6 +65,13 @@ Fixed lines mean tier sizes change with the league. Averaged over the 2010–202
 the tiers held 6.1 / 4.3 / 11.1 / 5.1 / 5.3 teams. Ratings spread out as a season goes on, so
 early-season tiers are more crowded in the middle.
 
+## Earlier weeks, reconstructed
+
+Games played before logging started (2026 Weeks 1–5, plus Denver–Seattle in Week 6) appear on
+the Record tab in their own section, rebuilt from the walk-forward replay: each game predicted
+only from games before its week. The data has no hindsight, but some settings were tuned while
+those weeks were visible, so it's kept apart from the live record.
+
 ## The rules this model follows
 
 - **No betting lines.** `nflmodel/data.py` drops every line and odds column at load.

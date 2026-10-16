@@ -154,11 +154,26 @@ def main():
 
     # Elo's long-run record on the same replay games Gridiron was scored on
     hist = {}
-    elo.ratings_through(games, season, week, history=hist)
+    elo.ratings_through(games, season, week + 1, history=hist)   # incl. this week's finished games
     rp = pd.read_csv("outputs/replay_games.csv")[["game_id", "result", "cv_wp"]]
     rp["elo_wp"] = rp.game_id.map(hist)
     rp = rp[rp.elo_wp.notna()]
     elo_backtest = {"gridiron": score(rp.cv_wp, rp.result), "elo": score(rp.elo_wp, rp.result)}
+
+    # This season's games that weren't logged live (before the log existed), reconstructed from
+    # the walk-forward replay: each prediction used only games played before that week.
+    rc = pd.read_csv("outputs/replay_games.csv")
+    rc = rc[(rc.season == season) & ~rc.game_id.isin(graded.game_id if len(graded) else [])].copy()
+    rc["elo_wp"] = rc.game_id.map(hist)
+    rc = rc[rc.elo_wp.notna()]
+    rc["home_pts"], rc["away_pts"] = (rc.cv_t + rc.cv_m) / 2, (rc.cv_t - rc.cv_m) / 2
+    reconstructed = {"games": [], "summary": {}}
+    if len(rc):
+        reconstructed["summary"] = {"gridiron": score(rc.cv_wp, rc.result), "elo": score(rc.elo_wp, rc.result)}
+        reconstructed["games"] = (rc.rename(columns={"cv_wp": "home_wp"})
+                                  [["game_id", "week", "home", "away", "home_pts", "away_pts", "home_wp", "elo_wp",
+                                    "home_score", "away_score"]]
+                                  .sort_values(["week", "game_id"], ascending=[False, True]).to_dict("records"))
 
     remaining = sched[sched.result.isna()]
     out = {
@@ -175,7 +190,8 @@ def main():
         "record": {"summary": summary,
                    "games": [] if graded.empty else graded[["game_id", "week", "home", "away", "home_pts", "away_pts",
                                                             "home_wp", "elo_wp", "home_score", "away_score", "brier"]]
-                   .sort_values(["week", "game_id"], ascending=[False, True]).to_dict("records")},
+                   .sort_values(["week", "game_id"], ascending=[False, True]).to_dict("records"),
+                   "reconstructed": reconstructed},
         "backtest": params["scorecard"],
         "elo": {"ratings": {t: elo_now[t] for t in r.teams}, "prev": {t: elo_prev[t] for t in r.teams},
                 "hfa": elo.HFA, "tiers": [{"name": n, "medal": m, "floor": f, "means": d} for n, m, f, d in elo.TIERS],
