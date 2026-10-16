@@ -74,6 +74,20 @@ Per extra event: takeaway +1.7 pts for, giveaway −1.6, sack taken −0.9, expl
 In an average game DEN wins by 7+ 22% of the time; the 90th-percentile outcome is DEN by 13–14.
 Descriptive, not causal: trailing teams pass more and so take more sacks and throw more picks.
 
+### Spotlight: Defense takes over (`defense_takes_over.py`)
+
+DEN 2+ takeaways, 0 giveaways, 4+ sacks, ≤1 sack allowed. Visual version: `defense_takes_over.html`.
+
+- **Typical final: DEN 24, SEA 16.** Denver wins 81%, by 7+ 61%, by 14+ 31%. The 10th–90th
+  percentile margin is DEN −2 to DEN +25.
+- **Turnovers do most of the work.** The turnover half alone wins 78% (25–17), and the sack half
+  alone wins 65% (23–18).
+- **Likelier tonight than usual: 5.3% (1 in 19) vs 2.0% league-wide.** This comes from Poisson
+  rates for each lever built from both teams' 2026 form, times a 2.85× clustering factor
+  (multiplying the four levers says 0.69% league-wide, but the real rate is 1.98%, because good
+  defensive nights bunch together). The biggest edge is sacks allowed: 57% vs 31%.
+- Denver has done it twice since 2019: 2023 wk 4 vs CHI (W 31–28) and 2024 wk 12 vs LV (W 29–19).
+
 ## Method
 
 1. **Ratings:** ridge regression of EPA/play on offense + defense + home field, fit separately for
@@ -120,6 +134,7 @@ python3 model.py --model-weight 0.3      # see the forecast with model weight
 python3 backtest.py                      # ~1 minute
 python3 injury_test.py                   # ~1 minute
 python3 scenarios.py
+python3 defense_takes_over.py
 ```
 
 Data: [nflverse](https://github.com/nflverse/nflverse-data) play-by-play, schedules, injury reports
