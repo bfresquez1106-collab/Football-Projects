@@ -39,10 +39,33 @@ def training_frame(pbp_by_season, season, before_week, w_prior=prior_weight):
     return pd.concat(parts, ignore_index=True)
 
 
+def luck_adjust(plays):
+    """
+    Take fumble-recovery luck out of EPA. Who recovers a fumble is a coin flip (a team's recovery
+    rate in odd weeks says nothing about even weeks), but fumbling is partly skill. So each fumble
+    keeps its cost at the AVERAGE recovery outcome instead of the actual bounce:
+        epa_adj = epa - (lost - league share lost) * (EPA gap between a lost and a kept fumble)
+    Rates and gaps come from the plays passed in (pre-kickoff data only), by run / pass / sack.
+    """
+    p = plays.copy()
+    f = p.fumble == 1
+    kind = np.where(p.sack == 1, "sack", np.where(p["pass"] == 1, "pass", "run"))
+    for k in ("run", "pass", "sack"):
+        m = f & (kind == k)
+        lost = p.fumble_lost[m] == 1
+        if lost.all() or not lost.any():
+            continue
+        share, gap = lost.mean(), p.epa[m][lost].mean() - p.epa[m][~lost].mean()
+        p.loc[m, "epa"] = p.epa[m] - (p.fumble_lost[m] - share) * gap
+    return p
+
+
 class Ratings:
-    def __init__(self, raw, alpha=ALPHA):
+    def __init__(self, raw, alpha=ALPHA, luck=False):
         plays = raw[((raw["pass"] == 1) | (raw["rush"] == 1)) & (raw.qb_kneel != 1)
                     & (raw.qb_spike != 1) & raw.epa.notna()].copy()
+        if luck:
+            plays = luck_adjust(plays)
         # +0.5 offense at home, -0.5 away, 0 at a neutral site
         plays["h"] = np.where(plays.location == "Neutral", 0.0,
                               np.where(plays.posteam == plays.home_team, 0.5, -0.5))

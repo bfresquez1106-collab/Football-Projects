@@ -25,6 +25,7 @@ Brier: lower is better. Elo benchmark on the same games: **0.2232**.
 | 6c | 2026-10-16 | Playmaking: explosive rate, scramble value, 3rd/4th-down value, deep passing | next-season error −0.9 / −1.4 / −0.4 / +0.2% | — | Rejected: already inside EPA |
 | 6d | 2026-10-16 | Pressure (PFR): pressure rate, sacks per pressure | next-season error −2.3 / −2.4% | — | Rejected |
 | 6e | 2026-10-16 | Scheme adjustment in the model, medium (`qbv_scheme1000`) / strong (`qbv_scheme300`) | 0.2223 / 0.2225 | −0.0001 / 0.0000 | **Kept: medium** (transfer test; gentler; no cost to stayers) |
+| 7 | 2026-10-22 | Luck-adjusted EPA: fumble recoveries at the league-average outcome (`luck_fumble` vs fresh control `control_1022`, 1,180 games) | 0.2231 vs 0.2228 | +0.0002 [−0.0005, +0.0009] | Rejected: moved margins ~0.5 pts, flipped 38 picks, no gain |
 
 **Tiebreak rule (written before applying it):** a change that doesn't move game predictions is kept
 if it's grounded in how football works *and* agrees at least as well with an independent measure
@@ -57,6 +58,14 @@ starter differs from the QBs already inside a team's numbers.
   (5th), but those plays are already high-EPA plays: weighting them again double-counts. Pressure
   rate is partly the QB's own doing, so it isn't a clean line measure.
 - **Opponent strength** washes out over a few hundred dropbacks; it didn't help.
+- **Fumble luck.** Recovering a fumble is pure luck (a team's recovery rate in odd weeks vs even
+  weeks: correlation ~0.00), while fumbling is partly skill (0.15–0.22). A lost fumble costs ~4.3 EPA
+  more than a kept one. Charging every fumble the average outcome changed predictions by ~0.5 pts
+  but not their accuracy: the luck is small next to the spread between teams (~0.012 vs ~0.07
+  EPA/play), and ridge shrinkage plus season memory already dilute it. Field-goal luck never
+  entered the ratings (they use runs and passes only). Kept as an off-by-default option, `--luck`.
+- **Re-running the same model** on updated data moved Brier from 0.2223 to 0.2228 (new games,
+  revised plays). Compare an experiment against a control run on the same data, not an old file.
 
 ## Where that leaves Gridiron vs Elo
 

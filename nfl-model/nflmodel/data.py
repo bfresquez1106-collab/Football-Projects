@@ -9,7 +9,7 @@ LINE_COLS = ["spread_line", "total_line", "away_moneyline", "home_moneyline", "a
              "home_spread_odds", "under_odds", "over_odds"]
 PBP_COLS = ["season", "season_type", "week", "game_id", "home_team", "away_team", "location",
             "posteam", "defteam", "pass", "rush", "epa", "wp", "qb_kneel", "qb_spike", "sack",
-            "interception", "fumble_lost", "yards_gained", "success", "down", "home_score", "away_score",
+            "interception", "fumble", "fumble_lost", "yards_gained", "success", "down", "home_score", "away_score",
             "qb_dropback", "passer_id"]
 FILES = {"pbp": "pbp/play_by_play_{s}.csv.gz", "snaps": "snap_counts/snap_counts_{s}.csv",
          "injuries": "injuries/injuries_{s}.csv"}
@@ -46,7 +46,8 @@ def pbp(data_dir, season):
     df = pd.read_csv(Path(data_dir) / LOCAL["pbp"].format(s=season), usecols=lambda c: c in PBP_COLS,
                      low_memory=False)
     df = df[(df.season_type == "REG") & df.posteam.notna() & df.defteam.notna()].copy()
-    for c in ["pass", "rush", "qb_kneel", "qb_spike", "sack", "interception", "fumble_lost", "success", "yards_gained"]:
+    for c in ["pass", "rush", "qb_kneel", "qb_spike", "sack", "interception", "fumble", "fumble_lost", "success",
+              "yards_gained"]:
         df[c] = df[c].fillna(0)
     return df
 
