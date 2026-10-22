@@ -61,7 +61,7 @@ def luck_adjust(plays):
 
 
 class Ratings:
-    def __init__(self, raw, alpha=ALPHA, luck=False):
+    def __init__(self, raw, alpha=ALPHA, luck=False, def_mult=1.0):
         plays = raw[((raw["pass"] == 1) | (raw["rush"] == 1)) & (raw.qb_kneel != 1)
                     & (raw.qb_spike != 1) & raw.epa.notna()].copy()
         if luck:
@@ -73,8 +73,8 @@ class Ratings:
         self.plays, self.clean = plays, clean
         self.teams = sorted(set(clean.posteam) | set(clean.defteam))
         self.tix = {t: i for i, t in enumerate(self.teams)}
-        self.PASS = self._fit(clean[clean["pass"] == 1], alpha)
-        self.RUSH = self._fit(clean[clean["rush"] == 1], alpha)
+        self.PASS = self._fit(clean[clean["pass"] == 1], alpha, def_mult)
+        self.RUSH = self._fit(clean[clean["rush"] == 1], alpha, def_mult)
 
         g = raw.groupby("game_id").agg(hs=("home_score", "max"), as_=("away_score", "max"), w=("w", "first"))
         self.ppg = wavg((g.hs + g.as_) / 2, g.w)
@@ -86,7 +86,7 @@ class Ratings:
         self.lg_pr = wavg(clean["pass"], clean.w)
         self.lg_epa = self.lg_pr * self.PASS["icpt"] + (1 - self.lg_pr) * self.RUSH["icpt"]
 
-    def _fit(self, d, alpha):
+    def _fit(self, d, alpha, def_mult=1.0):
         T, n = len(self.teams), len(d)
         X = np.zeros((n, 2 * T + 2))
         X[np.arange(n), d.posteam.map(self.tix).values] = 1.0
@@ -94,7 +94,8 @@ class Ratings:
         X[:, 2 * T] = d.h.values
         X[:, 2 * T + 1] = 1.0
         y, w = d.epa.values, d.w.values
-        pen = np.r_[np.ones(2 * T), 0.0, 0.0]          # don't shrink home field or intercept
+        # don't shrink home field or intercept; def_mult > 1 shrinks defense harder (it repeats less)
+        pen = np.r_[np.ones(T), np.full(T, def_mult), 0.0, 0.0]
         beta = np.linalg.solve((X.T * w) @ X + alpha * np.diag(pen), (X.T * w) @ y)
         return {"off": dict(zip(self.teams, beta[:T])), "dfn": dict(zip(self.teams, beta[T:2 * T])),
                 "home": float(beta[2 * T]), "icpt": float(beta[2 * T + 1]), "n": n}

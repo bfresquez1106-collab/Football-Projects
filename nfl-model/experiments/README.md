@@ -27,6 +27,7 @@ Brier: lower is better. Elo benchmark on the same games: **0.2232**.
 | 6e | 2026-10-16 | Scheme adjustment in the model, medium (`qbv_scheme1000`) / strong (`qbv_scheme300`) | 0.2223 / 0.2225 | −0.0001 / 0.0000 | **Kept: medium** (transfer test; gentler; no cost to stayers) |
 | 7 | 2026-10-22 | Luck-adjusted EPA: fumble recoveries at the league-average outcome (`luck_fumble` vs fresh control `control_1022`, 1,180 games) | 0.2231 vs 0.2228 | +0.0002 [−0.0005, +0.0009] | Rejected: moved margins ~0.5 pts, flipped 38 picks, no gain |
 | 8 | 2026-10-22 | Skill screen (`skill_screen.py`): 22 team stats × offense/defense, 320 team-seasons 2016–25, three gates (repeats, predicts Weeks 10+ points, adds beyond EPA) | — | — | Candidates: defense shrunk harder than offense; explosive plays allowed; sack rate taken |
+| 9 | 2026-10-22 | Shrink defense harder than offense: 2× / 4× / 8× / offense-only (`def_x*`, `off_only` vs control `control_1022b`, 1,180 games) | 0.2222 / 0.2224 / 0.2231 / 0.2254 vs 0.2228 | 2×: −0.0007 [−0.0017, +0.0003] (better in 90%) | Not kept: right direction, not proven. Offense-only clearly worse late in season |
 
 **Tiebreak rule (written before applying it):** a change that doesn't move game predictions is kept
 if it's grounded in how football works *and* agrees at least as well with an independent measure
@@ -72,6 +73,11 @@ starter differs from the QBs already inside a team's numbers.
   allowed by a defense (0.49 repeat, +0.19 beyond EPA) and sacks taken by an offense (0.62,
   −0.13). Passing EPA predicts more than rushing EPA (+0.13 vs −0.07 beyond total EPA).
   Repeatable but not predictive: pass rate over expected (a style, 0.84), stuffed runs.
+- **Offense vs defense.** Trusting offense more is right in moderation: shrinking defense 2× harder
+  was the best setting (helps Weeks 1–9), but 8× and offense-only hurt Weeks 10+, when a defense's
+  numbers have enough plays to be real. Less repeatable ≠ less important: defense still decides
+  half the game; its measurement is just noisier. Option kept, off by default: `--def-mult`.
+  Worth re-testing on a longer replay (2016+), where the interval would be narrower.
 - **Re-running the same model** on updated data moved Brier from 0.2223 to 0.2228 (new games,
   revised plays). Compare an experiment against a control run on the same data, not an old file.
 
