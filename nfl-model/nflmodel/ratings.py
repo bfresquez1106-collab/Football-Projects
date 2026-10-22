@@ -61,7 +61,7 @@ def luck_adjust(plays):
 
 
 class Ratings:
-    def __init__(self, raw, alpha=ALPHA, luck=False, def_mult=1.0):
+    def __init__(self, raw, alpha=ALPHA, luck=False, def_mult=1.0, expl_gamma=0.0):
         plays = raw[((raw["pass"] == 1) | (raw["rush"] == 1)) & (raw.qb_kneel != 1)
                     & (raw.qb_spike != 1) & raw.epa.notna()].copy()
         if luck:
@@ -75,6 +75,13 @@ class Ratings:
         self.tix = {t: i for i, t in enumerate(self.teams)}
         self.PASS = self._fit(clean[clean["pass"] == 1], alpha, def_mult)
         self.RUSH = self._fit(clean[clean["rush"] == 1], alpha, def_mult)
+        # Explosive plays allowed repeat better than defensive EPA (skill_screen.py), so optionally
+        # count them again: opponent-adjusted explosive rate (run 10+, pass 20+) x expl_gamma EPA.
+        self.expl_gamma = expl_gamma
+        if expl_gamma:
+            ex = (((clean["pass"] == 1) & (clean.sack != 1) & (clean.yards_gained >= 20))
+                  | ((clean.rush == 1) & (clean.yards_gained >= 10)))
+            self.EXPL = self._fit(clean.assign(epa=ex.astype(float)), alpha, def_mult)
 
         g = raw.groupby("game_id").agg(hs=("home_score", "max"), as_=("away_score", "max"), w=("w", "first"))
         self.ppg = wavg((g.hs + g.as_) / 2, g.w)
@@ -103,6 +110,9 @@ class Ratings:
     def epa_pair(self, off, dfn, h, adj=(0.0, 0.0)):
         ep = self.PASS["icpt"] + self.PASS["off"][off] + self.PASS["dfn"][dfn] + self.PASS["home"] * h + adj[0]
         er = self.RUSH["icpt"] + self.RUSH["off"][off] + self.RUSH["dfn"][dfn] + self.RUSH["home"] * h + adj[1]
+        if self.expl_gamma:
+            bump = self.expl_gamma * self.EXPL["dfn"][dfn]
+            ep, er = ep + bump, er + bump
         return ep, er
 
     def points(self, off, dfn, h, adj=(0.0, 0.0)):

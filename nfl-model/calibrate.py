@@ -34,7 +34,7 @@ from nflmodel.ratings import ALPHA, FADE_WEEKS, W_EARLY, W_PRIOR, Ratings, prior
 FIRST = 2022
 
 
-def replay(data_dir, last_season, first=FIRST, w_prior=W_PRIOR, alpha=ALPHA, qb_beta=0.0, qb_params="qb_params.json", luck=False, def_mult=1.0):
+def replay(data_dir, last_season, first=FIRST, w_prior=W_PRIOR, alpha=ALPHA, qb_beta=0.0, qb_params="qb_params.json", luck=False, def_mult=1.0, expl_gamma=0.0):
     seasons = range(first - 1, last_season + 1)
     pbp = {s: D.pbp(data_dir, s) for s in seasons}
     snaps = {s: D.snaps(data_dir, s) for s in seasons}
@@ -50,7 +50,7 @@ def replay(data_dir, last_season, first=FIRST, w_prior=W_PRIOR, alpha=ALPHA, qb_
         sg = games[(games.season == season) & (games.game_type == "REG") & games.result.notna()]
         for week in sorted(sg.week.unique()):
             tf = training_frame(pbp, season, week, w_prior)
-            r = Ratings(tf, alpha, luck, def_mult)
+            r = Ratings(tf, alpha, luck, def_mult, expl_gamma)
             qdelta = {}
             if qb_beta:
                 # starter's rating minus the QB rating already inside the team's numbers
@@ -111,6 +111,7 @@ def main():
     ap.add_argument("--qb-params", default="qb_params.json", help="QB index settings to use")
     ap.add_argument("--luck", action="store_true", help="take fumble-recovery luck out of EPA")
     ap.add_argument("--def-mult", type=float, default=1.0, help="shrink defense this many times harder than offense")
+    ap.add_argument("--expl-gamma", type=float, default=0.0, help="EPA per unit of a defense's explosive rate allowed, added again")
     ap.add_argument("--first", type=int, default=FIRST, help="first season to replay (needs the season before)")
     ap.add_argument("--tag", help="experiment name: writes experiments/<tag>.json instead of params.json")
     a = ap.parse_args()
@@ -119,7 +120,7 @@ def main():
 
     print("Replaying seasons week by week...")
     wp = a.w_prior if a.w_early is None else (lambda wk: prior_weight(wk, a.w_prior, a.w_early, a.fade_weeks))
-    bt, lev = replay(a.data_dir, a.season, a.first, wp, a.alpha, a.qb_beta, a.qb_params, a.luck, a.def_mult)
+    bt, lev = replay(a.data_dir, a.season, a.first, wp, a.alpha, a.qb_beta, a.qb_params, a.luck, a.def_mult, a.expl_gamma)
 
     # calibration (all seasons) + leave-one-season-out version for an honest scorecard
     cal = fit_calibration(bt)
@@ -183,7 +184,7 @@ def main():
                                   "mae_margin": float((d.result - d.cv_m).abs().mean())}
                          for s, d in bt.groupby("season")}
 
-    params = {"built": str(date.today()), "seasons": f"{a.first}-{a.season}", "w_prior": a.w_prior, "w_early": a.w_early, "fade_weeks": a.fade_weeks, "alpha": a.alpha, "qb_beta": a.qb_beta, "luck": a.luck, "def_mult": a.def_mult,
+    params = {"built": str(date.today()), "seasons": f"{a.first}-{a.season}", "w_prior": a.w_prior, "w_early": a.w_early, "fade_weeks": a.fade_weeks, "alpha": a.alpha, "qb_beta": a.qb_beta, "luck": a.luck, "def_mult": a.def_mult, "expl_gamma": a.expl_gamma,
               "calibration": cal, "sd_margin": sd_m, "sd_total": sd_t, "key_weights": w.round(4).tolist(),
               "lever_coef": coef, "lever_means": means.to_dict(), "sd_margin_given_levers": sd_m_levers,
               "scenario_freq": freq, "scorecard": card}

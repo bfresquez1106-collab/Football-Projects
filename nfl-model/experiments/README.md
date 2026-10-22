@@ -37,6 +37,7 @@ Brier: lower is better. Elo benchmark on the same games: **0.2232**.
 | 9 | 2026-10-22 | Shrink defense harder than offense: 2× / 4× / 8× / offense-only (`def_x*`, `off_only` vs control `control_1022b`, 1,180 games) | 0.2222 / 0.2224 / 0.2231 / 0.2254 vs 0.2228 | 2×: −0.0007 [−0.0017, +0.0003] (better in 90%) | Not kept: right direction, not proven. Offense-only clearly worse late in season |
 | 10 | 2026-10-22 | **Long replay, 2016–2026** (`--first 2016`, control `long_control`, 2,732 games) | 0.2195 (Elo 0.2221) | Gridiron vs Elo −0.0026 [−0.0061, +0.0007], better in 93% | New standard test bench |
 | 10a | 2026-10-22 | Shrink defense 2× on the long replay (`long_def_x2`) | 0.2189 | −0.0006 [−0.0013, +0.0001]; on unseen 2016–21 alone −0.0006 [−0.0016, +0.0003] | Not kept (rule): same size on new data, still not proven |
+| 11 | 2026-10-22 | Explosive plays allowed, counted again at 1.1 / 2.2 / 4.4 EPA (`long_expl_*` vs `long_control`, 2,732 games) | 0.2197 / 0.2205 / 0.2229 vs 0.2195 | +0.0002 / +0.0010 / +0.0033 [+0.0015, +0.0052] | Rejected: no gain; more weight = worse |
 
 **Tiebreak rule (written before applying it):** a change that doesn't move game predictions is kept
 if it's grounded in how football works *and* agrees at least as well with an independent measure
@@ -93,6 +94,13 @@ starter differs from the QBs already inside a team's numbers.
   Gridiron leads Elo by 0.0026 (better in 93%), loses 2016 clearly, wins 2017, 2018, 2020, 2021.
   The 2× defense effect replicated on unseen 2016–21 at the same size (−0.0006), but the rule
   says not proven, and the rule wasn't changed after seeing the result.
+- **Explosives allowed: why the screen misled.** The screen's signal was real (it held in 2016–20
+  and 2021–25, and survived adding last season's EPA), and the size it implied (1.15) was the size
+  tested. But its "beyond EPA" meant beyond a *raw* Weeks 1–9 EPA average, which is so noisy that
+  it earns only 4.7 points per 1.0 EPA/play (the model's ratings earn ~49). A stable side stat
+  soaks up the credit a noisy main stat can't claim. The model's EPA is opponent-adjusted,
+  ridge-shrunk, split pass/run and carries last season, so it already holds that information.
+  Fix for the screen: gate 3 should test "beyond the model's own ratings", not a raw average.
 - **Re-running the same model** on updated data moved Brier from 0.2223 to 0.2228 (new games,
   revised plays). Compare an experiment against a control run on the same data, not an old file.
 
