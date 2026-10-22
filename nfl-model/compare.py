@@ -3,6 +3,7 @@
 Judge experiments against the current model and the Elo benchmark, on the same replay games.
 
   python3 compare.py wprior_0.35 wprior_0.5          # names of experiments/<tag>_games.csv
+  python3 compare.py --base control_long def_long    # judge against a control run instead
 
 For each experiment: Brier score overall and by part of the season, and a paired bootstrap of
 "experiment minus current model" (negative = experiment is better). A change is worth keeping
@@ -29,11 +30,14 @@ def load(path, name):
 
 
 def main():
-    base = load("outputs/replay_games.csv", "current")
+    names = sys.argv[1:]
+    path = "outputs/replay_games.csv"
+    if names[:1] == ["--base"]:      # a control run on the same data and seasons
+        path, names = f"experiments/{names[1]}_games.csv", names[2:]
+    base = load(path, "current")
     hist = {}
     elo.ratings_through(D.games("data"), int(base.season.max()) + 1, 1, history=hist)
     base["elo"] = base.game_id.map(hist)
-    names = sys.argv[1:]
     for n in names:
         base = base.merge(load(f"experiments/{n}_games.csv", n)[["game_id", n]], on="game_id")
 

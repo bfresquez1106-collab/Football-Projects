@@ -1,8 +1,15 @@
 # Experiment log
 
-Every change is tested the same way: rerun the 2022–26 walk-forward replay (1,167 games), compare
+Every change is tested the same way: rerun the walk-forward replay, compare
 Brier scores game by game against the current model with a paired bootstrap (`compare.py`), and
 keep the change only if the whole 95% interval shows improvement. Failed ideas are recorded too.
+
+**Test bench (from #10 on):** the 2016–2026 replay, ~2,730 games:
+`python3 calibrate.py --first 2016 --tag NAME [options]`, then
+`python3 compare.py --base long_control NAME`. Re-run `long_control` whenever the data has been
+refreshed, so both sides use the same plays. Caveat: the QB index weights were fit on 2019–26 and
+Elo's settings on 2002–21, so each is partly in-sample here. That's fine for comparing two Gridiron
+versions, but weaker for Gridiron vs Elo. (#0–#9 used 2022–26, 1,167–1,180 games.)
 
 Brier: lower is better. Elo benchmark on the same games: **0.2232**.
 
@@ -28,6 +35,8 @@ Brier: lower is better. Elo benchmark on the same games: **0.2232**.
 | 7 | 2026-10-22 | Luck-adjusted EPA: fumble recoveries at the league-average outcome (`luck_fumble` vs fresh control `control_1022`, 1,180 games) | 0.2231 vs 0.2228 | +0.0002 [−0.0005, +0.0009] | Rejected: moved margins ~0.5 pts, flipped 38 picks, no gain |
 | 8 | 2026-10-22 | Skill screen (`skill_screen.py`): 22 team stats × offense/defense, 320 team-seasons 2016–25, three gates (repeats, predicts Weeks 10+ points, adds beyond EPA) | — | — | Candidates: defense shrunk harder than offense; explosive plays allowed; sack rate taken |
 | 9 | 2026-10-22 | Shrink defense harder than offense: 2× / 4× / 8× / offense-only (`def_x*`, `off_only` vs control `control_1022b`, 1,180 games) | 0.2222 / 0.2224 / 0.2231 / 0.2254 vs 0.2228 | 2×: −0.0007 [−0.0017, +0.0003] (better in 90%) | Not kept: right direction, not proven. Offense-only clearly worse late in season |
+| 10 | 2026-10-22 | **Long replay, 2016–2026** (`--first 2016`, control `long_control`, 2,732 games) | 0.2195 (Elo 0.2221) | Gridiron vs Elo −0.0026 [−0.0061, +0.0007], better in 93% | New standard test bench |
+| 10a | 2026-10-22 | Shrink defense 2× on the long replay (`long_def_x2`) | 0.2189 | −0.0006 [−0.0013, +0.0001]; on unseen 2016–21 alone −0.0006 [−0.0016, +0.0003] | Not kept (rule): same size on new data, still not proven |
 
 **Tiebreak rule (written before applying it):** a change that doesn't move game predictions is kept
 if it's grounded in how football works *and* agrees at least as well with an independent measure
@@ -78,6 +87,12 @@ starter differs from the QBs already inside a team's numbers.
   numbers have enough plays to be real. Less repeatable ≠ less important: defense still decides
   half the game; its measurement is just noisier. Option kept, off by default: `--def-mult`.
   Worth re-testing on a longer replay (2016+), where the interval would be narrower.
+- **Longer replay.** 2,732 games instead of 1,180 narrows the bootstrap interval by about a third.
+  Relocated teams (SD, OAK, STL) needed mapping in schedules, snaps and injuries. Home field
+  varies a lot by season (about +2.5 in 2016–18, ~0 in 2019 and 2020, ~2 since). Over 2016–26
+  Gridiron leads Elo by 0.0026 (better in 93%), loses 2016 clearly, wins 2017, 2018, 2020, 2021.
+  The 2× defense effect replicated on unseen 2016–21 at the same size (−0.0006), but the rule
+  says not proven, and the rule wasn't changed after seeing the result.
 - **Re-running the same model** on updated data moved Brier from 0.2223 to 0.2228 (new games,
   revised plays). Compare an experiment against a control run on the same data, not an old file.
 

@@ -30,15 +30,17 @@ project's README and in `nfl-model/experiments/README.md`.
 - **Injuries:** missing starting DBs/LBs from snap counts + injury report.
 - **Calibration** from a 2022–26 walk-forward replay (1,167 games): +2.6 home-field points,
   margin shrink 0.78, totals shrink ~0.5; key-number-aware score distribution.
-- **Scores (replay Brier, lower is better):** Gridiron **0.2225**, Elo **0.2232**, a statistical
-  tie (Gridiron better in ~61% of resamples). Gridiron picks ~64.7% of winners.
+- **Scores (replay Brier, lower is better):** 2022–26: Gridiron **0.2225**, Elo **0.2232** (a tie).
+  2016–26 (2,732 games): Gridiron **0.2195**, Elo **0.2221** (Gridiron better in 93% of
+  resamples). Gridiron picks ~65% of winners.
 - **Elo tiers** on the dashboard: Dynasty / Powerhouse / Contender / Challenger / Underdog
   (fixed Elo lines).
 
 ## Rules for changing the model
 
-1. One change at a time. Run it as an experiment: `python3 calibrate.py --tag NAME [options]`,
-   then `python3 compare.py NAME`.
+1. One change at a time, on the 2016–2026 replay (~2,730 games): `python3 calibrate.py --first 2016
+   --tag NAME [options]`, then `python3 compare.py --base long_control NAME`. Re-run `long_control`
+   (same command, no options) after a data refresh so both sides see the same plays.
 2. **Keep it only if the paired bootstrap 95% interval is entirely below zero** (better).
 3. **Tiebreak rule** for changes that don't move game predictions (most QB-index changes): keep
    if grounded in how football works *and* agrees at least as well with an independent measure
@@ -49,7 +51,10 @@ project's README and in `nfl-model/experiments/README.md`.
    fingerprint of `params.json` + `qb_params.json`.
 
 Already tested and rejected: weather, opponent adjustment for QBs, playmaking stats (explosives,
-scrambles, 3rd/4th down, deep), PFR pressure rates, fixed season-memory weights.
+scrambles, 3rd/4th down, deep), PFR pressure rates, fixed season-memory weights, fumble-luck
+adjustment (`--luck`). Right direction but not proven: shrinking defense 2× (`--def-mult 2`).
+`skill_screen.py` tests whether a team stat repeats, predicts, and adds beyond EPA. Run it before
+building any new stat into the model.
 
 ## Weekly operation
 

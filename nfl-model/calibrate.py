@@ -34,19 +34,19 @@ from nflmodel.ratings import ALPHA, FADE_WEEKS, W_EARLY, W_PRIOR, Ratings, prior
 FIRST = 2022
 
 
-def replay(data_dir, last_season, w_prior=W_PRIOR, alpha=ALPHA, qb_beta=0.0, qb_params="qb_params.json", luck=False, def_mult=1.0):
-    seasons = range(FIRST - 1, last_season + 1)
+def replay(data_dir, last_season, first=FIRST, w_prior=W_PRIOR, alpha=ALPHA, qb_beta=0.0, qb_params="qb_params.json", luck=False, def_mult=1.0):
+    seasons = range(first - 1, last_season + 1)
     pbp = {s: D.pbp(data_dir, s) for s in seasons}
     snaps = {s: D.snaps(data_dir, s) for s in seasons}
     inj = {s: D.injuries(data_dir, s) for s in seasons}
     games = D.games(data_dir)
     if qb_beta:
         qp = json.load(open(qb_params))
-        qsums, _ = qb.load_sums([Path(data_dir) / f"pbp_{s}.csv.gz" for s in range(FIRST - 4, last_season + 1)
+        qsums, _ = qb.load_sums([Path(data_dir) / f"pbp_{s}.csv.gz" for s in range(first - 4, last_season + 1)
                                  if (Path(data_dir) / f"pbp_{s}.csv.gz").exists()])
         repl = qb.replacement_rating(qp)
     rows = []
-    for season in range(FIRST, last_season + 1):
+    for season in range(first, last_season + 1):
         sg = games[(games.season == season) & (games.game_type == "REG") & games.result.notna()]
         for week in sorted(sg.week.unique()):
             tf = training_frame(pbp, season, week, w_prior)
@@ -76,7 +76,7 @@ def replay(data_dir, last_season, w_prior=W_PRIOR, alpha=ALPHA, qb_beta=0.0, qb_
     bt = pd.DataFrame(rows)
     bt["raw_m"], bt["raw_t"] = bt.raw_home - bt.raw_away, bt.raw_home + bt.raw_away
     bt["result"], bt["total"] = bt.home_score - bt.away_score, bt.home_score + bt.away_score
-    lev = pd.concat([D.team_game_levers(pbp[s]) for s in range(FIRST, last_season + 1)])
+    lev = pd.concat([D.team_game_levers(pbp[s]) for s in range(first, last_season + 1)])
     return bt, lev
 
 
@@ -111,14 +111,15 @@ def main():
     ap.add_argument("--qb-params", default="qb_params.json", help="QB index settings to use")
     ap.add_argument("--luck", action="store_true", help="take fumble-recovery luck out of EPA")
     ap.add_argument("--def-mult", type=float, default=1.0, help="shrink defense this many times harder than offense")
+    ap.add_argument("--first", type=int, default=FIRST, help="first season to replay (needs the season before)")
     ap.add_argument("--tag", help="experiment name: writes experiments/<tag>.json instead of params.json")
     a = ap.parse_args()
     if a.fetch:
-        D.fetch(a.data_dir, range(FIRST - 1, a.season + 1), current=a.season)
+        D.fetch(a.data_dir, range(a.first - 1, a.season + 1), current=a.season)
 
     print("Replaying seasons week by week...")
     wp = a.w_prior if a.w_early is None else (lambda wk: prior_weight(wk, a.w_prior, a.w_early, a.fade_weeks))
-    bt, lev = replay(a.data_dir, a.season, wp, a.alpha, a.qb_beta, a.qb_params, a.luck, a.def_mult)
+    bt, lev = replay(a.data_dir, a.season, a.first, wp, a.alpha, a.qb_beta, a.qb_params, a.luck, a.def_mult)
 
     # calibration (all seasons) + leave-one-season-out version for an honest scorecard
     cal = fit_calibration(bt)
@@ -182,7 +183,7 @@ def main():
                                   "mae_margin": float((d.result - d.cv_m).abs().mean())}
                          for s, d in bt.groupby("season")}
 
-    params = {"built": str(date.today()), "seasons": f"{FIRST}-{a.season}", "w_prior": a.w_prior, "w_early": a.w_early, "fade_weeks": a.fade_weeks, "alpha": a.alpha, "qb_beta": a.qb_beta, "luck": a.luck, "def_mult": a.def_mult,
+    params = {"built": str(date.today()), "seasons": f"{a.first}-{a.season}", "w_prior": a.w_prior, "w_early": a.w_early, "fade_weeks": a.fade_weeks, "alpha": a.alpha, "qb_beta": a.qb_beta, "luck": a.luck, "def_mult": a.def_mult,
               "calibration": cal, "sd_margin": sd_m, "sd_total": sd_t, "key_weights": w.round(4).tolist(),
               "lever_coef": coef, "lever_means": means.to_dict(), "sd_margin_given_levers": sd_m_levers,
               "scenario_freq": freq, "scorecard": card}

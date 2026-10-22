@@ -13,6 +13,7 @@ PBP_COLS = ["season", "season_type", "week", "game_id", "home_team", "away_team"
             "qb_dropback", "passer_id"]
 FILES = {"pbp": "pbp/play_by_play_{s}.csv.gz", "snaps": "snap_counts/snap_counts_{s}.csv",
          "injuries": "injuries/injuries_{s}.csv"}
+RELOCATED = {"OAK": "LV", "SD": "LAC", "STL": "LA"}   # old codes in schedules, snaps, injuries (pbp is already current)
 LOCAL = {"pbp": "pbp_{s}.csv.gz", "snaps": "snap_counts_{s}.csv", "injuries": "injuries_{s}.csv"}
 
 
@@ -39,6 +40,7 @@ def fetch(data_dir, seasons, current):
 
 def games(data_dir):
     g = pd.read_csv(Path(data_dir) / "games.csv")
+    g[["home_team", "away_team"]] = g[["home_team", "away_team"]].replace(RELOCATED)
     return g.drop(columns=[c for c in LINE_COLS if c in g.columns])
 
 
@@ -54,12 +56,12 @@ def pbp(data_dir, season):
 
 def snaps(data_dir, season):
     s = pd.read_csv(Path(data_dir) / LOCAL["snaps"].format(s=season))
-    return s[s.game_type == "REG"]
+    return s[s.game_type == "REG"].assign(team=lambda x: x.team.replace(RELOCATED))
 
 
 def injuries(data_dir, season):
     p = Path(data_dir) / LOCAL["injuries"].format(s=season)
-    return pd.read_csv(p) if p.exists() else pd.DataFrame()
+    return pd.read_csv(p).assign(team=lambda x: x.team.replace(RELOCATED)) if p.exists() else pd.DataFrame()
 
 
 def depth_qbs(data_dir, season):
