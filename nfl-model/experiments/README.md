@@ -26,6 +26,7 @@ Brier: lower is better. Elo benchmark on the same games: **0.2232**.
 | 6d | 2026-10-16 | Pressure (PFR): pressure rate, sacks per pressure | next-season error −2.3 / −2.4% | — | Rejected |
 | 6e | 2026-10-16 | Scheme adjustment in the model, medium (`qbv_scheme1000`) / strong (`qbv_scheme300`) | 0.2223 / 0.2225 | −0.0001 / 0.0000 | **Kept: medium** (transfer test; gentler; no cost to stayers) |
 | 7 | 2026-10-22 | Luck-adjusted EPA: fumble recoveries at the league-average outcome (`luck_fumble` vs fresh control `control_1022`, 1,180 games) | 0.2231 vs 0.2228 | +0.0002 [−0.0005, +0.0009] | Rejected: moved margins ~0.5 pts, flipped 38 picks, no gain |
+| 8 | 2026-10-22 | Skill screen (`skill_screen.py`): 22 team stats × offense/defense, 320 team-seasons 2016–25, three gates (repeats, predicts Weeks 10+ points, adds beyond EPA) | — | — | Candidates: defense shrunk harder than offense; explosive plays allowed; sack rate taken |
 
 **Tiebreak rule (written before applying it):** a change that doesn't move game predictions is kept
 if it's grounded in how football works *and* agrees at least as well with an independent measure
@@ -64,6 +65,13 @@ starter differs from the QBs already inside a team's numbers.
   but not their accuracy: the luck is small next to the spread between teams (~0.012 vs ~0.07
   EPA/play), and ridge shrinkage plus season memory already dilute it. Field-goal luck never
   entered the ratings (they use runs and passes only). Kept as an off-by-default option, `--luck`.
+- **Skill screen.** Offense is far more repeatable than defense (EPA/play, full season 0.71 vs
+  0.39), so defensive ratings deserve more shrinkage. Mostly luck (full-season repeat ≤ 0.25):
+  red-zone TD rate, interceptions, fumbles, takeaways, field-goal %, offensive field position,
+  defensive 3rd-down and 3rd/4th-down EPA. Repeatable *and* adds beyond EPA: explosive plays
+  allowed by a defense (0.49 repeat, +0.19 beyond EPA) and sacks taken by an offense (0.62,
+  −0.13). Passing EPA predicts more than rushing EPA (+0.13 vs −0.07 beyond total EPA).
+  Repeatable but not predictive: pass rate over expected (a style, 0.84), stuffed runs.
 - **Re-running the same model** on updated data moved Brier from 0.2223 to 0.2228 (new games,
   revised plays). Compare an experiment against a control run on the same data, not an old file.
 
