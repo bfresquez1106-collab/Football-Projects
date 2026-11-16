@@ -8,7 +8,7 @@ grows into a real question, it moves here.
 
 | Project | Question | Data |
 |---|---|---|
-| _none yet_ | | |
+| [Match report](match-report/) | What does one match look like on a single page? | StatsBomb open data |
 
 Give each project its own folder with a `README.md` (the question, the data,
 how to run it) and a `requirements.txt`, so each one stands on its own.
