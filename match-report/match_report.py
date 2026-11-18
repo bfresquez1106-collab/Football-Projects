@@ -30,6 +30,7 @@ THEME = {
     "ink":      "#2B2D42",     # text, key marks (deep indigo)
     "graphite": "#5E6178",     # pitch lines, secondary text
     "stone":    "#B9C4C0",     # misses, clearances, quiet marks
+    "pitch":    "#C3CDC8",     # pitch lines: quieter than the data
     "team_a":   "#3581B8",     # left team (blue)
     "team_b":   "#C33149",     # right team (crimson)
     "accent":   "#499167",     # the one highlight (green)
@@ -63,7 +64,7 @@ XT16 = np.load(Path(__file__).parent / "xt16.npy")
 def _canvas(ax, **pitch_kwargs):
     """A themed pitch: draws on a new figure, or on the ax it is given."""
     pitch = Pitch(pitch_type="statsbomb", pitch_color=THEME["paper"],
-                  line_color=THEME["graphite"], linewidth=1 * LW, **pitch_kwargs)
+                  line_color=THEME["pitch"], linewidth=1.2, **pitch_kwargs)
     if ax is None:
         fig, ax = pitch.draw(figsize=(10, 7))
         fig.set_facecolor(THEME["paper"])
@@ -73,7 +74,7 @@ def _canvas(ax, **pitch_kwargs):
 
 
 def _title(ax, text):
-    ax.set_title(text, loc="left", fontsize=12 * FS, color=THEME["ink"], pad=8)
+    ax.set_title(text, loc="left", fontsize=12 * FS, color=THEME["graphite"], pad=10)
 
 
 def _ramp(color):
@@ -137,7 +138,7 @@ def xt_pitch(events, team, color, ax=None, min_label=0.08, vmax=None):
                         ha="center", va="center", fontsize=10 * FS, zorder=3,
                         color=THEME["paper"] if dark else THEME["ink"])
 
-    _title(ax, f"{team}: xT added by start zone (total {m['xt'].sum():.2f})")
+    _title(ax, f"xT added by start zone  \u00b7  total {m['xt'].sum():.2f}")
     return ax
 
 
@@ -153,7 +154,7 @@ ZONES = {
 }
 
 
-def pass_panel(events, team, color, zone, ax=None):
+def pass_panel(events, team, color, zone, ax=None, max_arrows=30):
     title, rule = ZONES[zone]
 
     p = events[(events["team"] == team) & (events["type"] == "Pass")]
@@ -168,23 +169,25 @@ def pass_panel(events, team, color, zone, ax=None):
 
     pitch, ax = _canvas(ax)
 
-    # misses in stone underneath, completed passes in the team color on top
+    # misses: a small stone dot where the pass ended, no line
     miss, hit = p[~done], p[done]
-    pitch.arrows(miss["x"], miss["y"], miss["end_x"], miss["end_y"],
-                 color=THEME["stone"], alpha=0.8, width=1.5 * LW, headwidth=3.5,
-                 headlength=3.5, zorder=1, ax=ax)
-    pitch.arrows(hit["x"], hit["y"], hit["end_x"], hit["end_y"],
-                 color=color, alpha=0.85, width=1.5 * LW, headwidth=3.5,
-                 headlength=3.5, zorder=2, ax=ax)
+    pitch.scatter(miss["end_x"], miss["end_y"], s=28, color=THEME["stone"],
+                  alpha=0.9, zorder=1, ax=ax)
 
-    _title(ax, f"{team}: {title} ({done.sum()}/{len(p)}, "
-               f"{done.mean() * 100:.0f}% complete)")
+    # completed passes: only the most forward ones when there are too many
+    shown = hit.assign(gain=hit["end_x"] - hit["x"]).nlargest(max_arrows, "gain")
+    pitch.arrows(shown["x"], shown["y"], shown["end_x"], shown["end_y"],
+                 color=color, alpha=0.8, width=2.2 * LW, headwidth=4,
+                 headlength=4, zorder=2, ax=ax)
+
+    note = f"  \u00b7  {len(shown)} most forward shown" if len(hit) > max_arrows else ""
+    _title(ax, f"{title}  \u00b7  {done.sum()}/{len(p)} complete{note}")
     return ax
 
 
 # ------------------------------------------------------- pass network
 
-def pass_network(events, team, color, short_names=None, min_passes=3, ax=None):
+def pass_network(events, team, color, short_names=None, min_passes=5, max_links=14, ax=None):
     short_names = short_names or {}
 
     p = events[(events["team"] == team) & (events["type"] == "Pass")].copy()
@@ -199,10 +202,10 @@ def pass_network(events, team, color, short_names=None, min_passes=3, ax=None):
     came_on = set(subs["substitution_replacement"].dropna())
 
     pairs = p.groupby(["player", "pass_recipient"]).size().reset_index(name="count")
-    pairs = pairs[pairs["count"] >= min_passes]
+    pairs = pairs[pairs["count"] >= min_passes].nlargest(max_links, "count")
 
     pitch, ax = _canvas(ax)
-    _title(ax, f"{team} pass map")
+    _title(ax, "Pass network  \u00b7  completed passes, 5 or more")
 
     for _, row in pairs.iterrows():
         a = row["player"]
@@ -210,11 +213,11 @@ def pass_network(events, team, color, short_names=None, min_passes=3, ax=None):
         if a in avg.index and b in avg.index:
             pitch.lines(avg.loc[a, "x"], avg.loc[a, "y"],
                         avg.loc[b, "x"], avg.loc[b, "y"],
-                        lw=row["count"] / pairs["count"].max() * 6,
-                        color=THEME["ink"], alpha=0.3, zorder=1, ax=ax)
+                        lw=2 + row["count"] / pairs["count"].max() * 9,
+                        color=color, alpha=0.35, zorder=1, ax=ax)
 
     colors = [THEME["stone"] if name in came_on else color for name in avg.index]
-    pitch.scatter(avg["x"], avg["y"], s=avg["n"] * 10, c=colors,
+    pitch.scatter(avg["x"], avg["y"], s=avg["n"] * 16, c=colors,
                   edgecolors=THEME["paper"], linewidth=1.5 * LW, alpha=0.95,
                   zorder=2, ax=ax)
 
@@ -222,7 +225,8 @@ def pass_network(events, team, color, short_names=None, min_passes=3, ax=None):
     for name, row in avg.iterrows():
         label = short_names.get(name, name.split()[-1])
         ax.text(row["x"], row["y"] - 3.5, label, ha="center", va="bottom",
-                fontsize=9 * FS, color=THEME["ink"], path_effects=_halo(), zorder=4)
+                fontsize=11 * FS, fontweight="bold", color=THEME["ink"],
+                path_effects=_halo(), zorder=4)
 
     return ax
 
@@ -388,19 +392,14 @@ def defensive_actions(events, team, ax=None, legend=True):
                       edgecolors=edge, linewidths=1 * LW, label=kind, zorder=3, ax=ax)
 
     avg_x = d.loc[d["kind"] != "Clearance", "x"].mean()
-    high = (d["x"] >= 80).sum()
     ax.axvline(avg_x, color=THEME["accent"], lw=2.5 * LW, zorder=2,
                label="Average height (excl. clearances)")
     ax.text(avg_x, 84, f"{avg_x / 120 * 100:.1f}% up the pitch",
             fontsize=11 * FS, ha="center", va="top", color=THEME["ink"])
-    ax.text(120, 84, f"PPDA {ppda(events, team):.1f}", fontsize=11 * FS, ha="right",
-            va="top", color=THEME["graphite"])
-    ax.text(120, 89, f"{high} actions in the final third", fontsize=11 * FS, ha="right",
-            va="top", color=THEME["graphite"])
 
     if legend:
         ax.legend(loc="lower right", fontsize=8 * FS, framealpha=0.9)
-    _title(ax, f"{team}: defensive actions ({len(d)})")
+    _title(ax, f"Defensive actions  \u00b7  {len(d)}")
     return ax
 
 
