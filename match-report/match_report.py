@@ -228,9 +228,11 @@ def pass_network(events, team, color, short_names=None, min_passes=5, max_links=
     boxes = []
     for name, row in avg.sort_values("n", ascending=False).iterrows():
         label = short_names.get(name, name.split()[-1])
-        for dy, va in [(-3.5, "bottom"), (3.5, "top"), (-9, "bottom"), (9, "top"),
-                       (-14, "bottom"), (14, "top")]:
-            t = ax.text(row["x"], row["y"] + dy, label, ha="center", va=va,
+        for dx, dy, ha, va in [(0, -3.5, "center", "bottom"), (0, 3.5, "center", "top"),
+                               (3, 0, "left", "center"), (-3, 0, "right", "center"),
+                               (0, -9, "center", "bottom"), (0, 9, "center", "top"),
+                               (3, -6, "left", "bottom"), (-3, 6, "right", "top")]:
+            t = ax.text(row["x"] + dx, row["y"] + dy, label, ha=ha, va=va,
                         fontsize=11 * FS, fontweight="bold", color=THEME["ink"],
                         path_effects=_halo(), zorder=4)
             bb = t.get_window_extent(renderer).expanded(1.08, 1.15)
