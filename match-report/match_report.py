@@ -292,7 +292,8 @@ def ppda(events, team, zone_x=48):
     return passes_allowed / actions
 
 
-def stats_panel(events, left_team, right_team, left_color, right_color, ax):
+def stats_panel(events, left_team, right_team, left_color, right_color, ax,
+                step=0.085, x_left=0.68, show_names=True):
     teams = [left_team, right_team]
     passes = events[events["type"] == "Pass"].copy()
     passes["x"] = passes["location"].apply(lambda loc: loc[0])
@@ -324,15 +325,15 @@ def stats_panel(events, left_team, right_team, left_color, right_color, ax):
     ax.axis("off")
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
-    step = 0.085
-    x_left, x_right = 0.68, 1.0
+    x_right = 1.0
     top = 0.5 + (len(labels) + 1) * step / 2
 
     y = top - step / 2
-    ax.text(x_left, y, left_team, ha="right", va="center", fontsize=13 * FS,
-            fontweight="bold", color=left_color)
-    ax.text(x_right, y, right_team, ha="right", va="center", fontsize=13 * FS,
-            fontweight="bold", color=right_color)
+    if show_names:
+        ax.text(x_left, y, left_team, ha="right", va="center", fontsize=13 * FS,
+                fontweight="bold", color=left_color)
+        ax.text(x_right, y, right_team, ha="right", va="center", fontsize=13 * FS,
+                fontweight="bold", color=right_color)
     ax.plot([0, 1], [y - step / 2] * 2, color=THEME["ink"], lw=0.9 * LW, clip_on=False)
 
     for i, label in enumerate(labels):
@@ -448,66 +449,88 @@ def match_report(match_id, left, right, left_color=None, right_color=None,
     rc = {"font.family": "sans-serif", "font.sans-serif": THEME["font"]}
 
     with plt.rc_context(rc):
-        fig = plt.figure(figsize=(24, 38), facecolor=THEME["paper"])
+        fig = plt.figure(figsize=(29, 29), facecolor=THEME["paper"])
+        # column 0 is the left rail (names, score, stats table, legend);
+        # columns 1-3 are the maps. Rows: shot-map band, then one block per team.
         gs = fig.add_gridspec(
-            8, 3, width_ratios=[1, 1.1, 1],
-            height_ratios=[0.35, 1, 1, 1, 1, 1, 1, 0.12],
-            hspace=0.28, wspace=0.05, left=0.03, right=0.97, top=0.98, bottom=0.02)
+            8, 4, width_ratios=[0.8, 1, 1, 1],
+            height_ratios=[1.4, 0.16, 1, 1, 0.16, 1, 1, 0.1],
+            hspace=0.30, wspace=0.07, left=0.025, right=0.985, top=0.985, bottom=0.015)
 
-        # header: team, score, team, with a hairline under it
-        ax_head = fig.add_subplot(gs[0, :])
+        # ---- left rail: names, score, stats table, legend
+        rail = gs[0:7, 0].subgridspec(3, 1, height_ratios=[1.5, 3.2, 1.6], hspace=0.12)
+
+        ax_head = fig.add_subplot(rail[0])
         ax_head.axis("off")
         ax_head.set_xlim(0, 1)
         ax_head.set_ylim(0, 1)
-        ax_head.text(0.0, 0.45, left, ha="left", va="center", fontsize=44,
+        ax_head.text(0.0, 0.93, left, ha="left", va="top", fontsize=30,
                      fontweight="bold", color=left_color)
-        ax_head.text(1.0, 0.45, right, ha="right", va="center", fontsize=44,
+        ax_head.text(0.0, 0.76, right, ha="left", va="top", fontsize=30,
                      fontweight="bold", color=right_color)
-        ax_head.text(0.5, 0.45, f"{goals(events, left)}–{goals(events, right)}",
-                     ha="center", va="center", fontsize=60, color=ink)
+        ax_head.text(0.0, 0.50, f"{goals(events, left)}\u2013{goals(events, right)}",
+                     ha="left", va="top", fontsize=84, color=ink)
         if subtitle:
-            ax_head.text(0.5, 0.98, subtitle, ha="center", va="top",
+            ax_head.text(0.0, 0.10, subtitle, ha="left", va="top",
                          fontsize=13 * FS, color=graphite)
-        ax_head.plot([0, 1], [0.02, 0.02], color=ink, lw=1 * LW, clip_on=False)
+        ax_head.plot([0, 1], [0.0, 0.0], color=ink, lw=1 * LW, clip_on=False)
 
-        # the two side columns: one loop per team
-        for team, color, col in [(left, left_color, 0), (right, right_color, 2)]:
-            pass_network(events, team, color, short_names, ax=fig.add_subplot(gs[1, col]))
-            pass_panel(events, team, color, "in_final_third", ax=fig.add_subplot(gs[2, col]))
-            pass_panel(events, team, color, "into_final_third", ax=fig.add_subplot(gs[3, col]))
-            pass_panel(events, team, color, "to_box", ax=fig.add_subplot(gs[4, col]))
-            defensive_actions(events, team, ax=fig.add_subplot(gs[5, col]), legend=False)
-            xt_pitch(events, team, color, ax=fig.add_subplot(gs[6, col]), vmax=xt_vmax)
+        # stats table: team colors sit on the column headers, so write short
+        # colored labels instead of the full names (they can be long)
+        ax_stats = fig.add_subplot(rail[1])
+        stats_panel(events, left, right, left_color, right_color, ax=ax_stats,
+                    step=0.088, x_left=0.70, show_names=False)
+        y_head = 0.5 + 10 * 0.088 / 2 - 0.088 / 2      # the header row of the table
+        ax_stats.text(0.70, y_head, "\u25CF", ha="right", va="center", fontsize=20 * FS,
+                      color=left_color)
+        ax_stats.text(1.0, y_head, "\u25CF", ha="right", va="center", fontsize=20 * FS,
+                      color=right_color)
 
-        # the middle column
-        stats_panel(events, left, right, left_color, right_color,
-                    ax=fig.add_subplot(gs[1:3, 1]))
-        shot_map(events, left, right, left_color, right_color, short_names,
-                 ax=fig.add_subplot(gs[3:5, 1]))
-
-        # one shared legend, built by hand so it stays neutral
+        # shared defensive-map legend, built by hand so it stays neutral
         handles = [Line2D([0], [0], marker=m, linestyle="none", markersize=11,
                           markerfacecolor=face, markeredgecolor=edge, label=kind)
                    for kind, (m, face, edge) in STYLES.items()]
         handles.append(Line2D([0], [0], color=THEME["accent"], lw=2.5 * LW,
                               label="Average height (excl. clearances)"))
-        ax_leg = fig.add_subplot(gs[5, 1])
+        ax_leg = fig.add_subplot(rail[2])
         ax_leg.axis("off")
-        ax_leg.legend(handles=handles, loc="center", fontsize=13 * FS, frameon=False,
-                      labelcolor=ink)
-        ax_leg.text(0.5, 0.03, "Pass and defensive maps: attacking left to right →",
-                    ha="center", va="bottom", fontsize=11 * FS, color=graphite,
-                    transform=ax_leg.transAxes)
+        ax_leg.legend(handles=handles, loc="upper left", fontsize=12 * FS, frameon=False,
+                      labelcolor=ink, title="Defensive actions", title_fontsize=12 * FS,
+                      alignment="left")
 
-        ax_note = fig.add_subplot(gs[6, 1])
+        # ---- top band: shot map (two columns wide) + how-to-read notes
+        shot_map(events, left, right, left_color, right_color, short_names,
+                 ax=fig.add_subplot(gs[0, 1:3]))
+        ax_note = fig.add_subplot(gs[0, 3])
         ax_note.axis("off")
-        ax_note.text(0.5, 0.5,
-                     "xT added = value of end zone minus start zone\n"
-                     "completed passes and carries, positive gains only",
-                     ha="center", va="center", fontsize=12 * FS, color=graphite,
+        ax_note.text(0.0, 0.92,
+                     "How to read\n\n"
+                     "Pass and defensive maps:\nattacking left to right \u2192\n\n"
+                     "xT added = value of end zone\nminus start zone; completed\n"
+                     "passes and carries, positive\ngains only",
+                     ha="left", va="top", fontsize=13 * FS, color=graphite,
                      linespacing=1.6)
 
-        # footer
+        # ---- one block of six maps per team
+        blocks = [(left, left_color, 1, 2), (right, right_color, 4, 5)]
+        for team, color, label_row, first_row in blocks:
+            ax_lab = fig.add_subplot(gs[label_row, 1:4])
+            ax_lab.axis("off")
+            ax_lab.set_xlim(0, 1)
+            ax_lab.set_ylim(0, 1)
+            ax_lab.text(0.0, 0.5, team, ha="left", va="center", fontsize=24,
+                        fontweight="bold", color=color)
+            ax_lab.plot([0, 1], [0.0, 0.0], color=ink, lw=0.8 * LW, clip_on=False)
+
+            r1, r2 = first_row, first_row + 1
+            pass_network(events, team, color, short_names, ax=fig.add_subplot(gs[r1, 1]))
+            pass_panel(events, team, color, "in_final_third", ax=fig.add_subplot(gs[r1, 2]))
+            pass_panel(events, team, color, "into_final_third", ax=fig.add_subplot(gs[r1, 3]))
+            pass_panel(events, team, color, "to_box", ax=fig.add_subplot(gs[r2, 1]))
+            defensive_actions(events, team, ax=fig.add_subplot(gs[r2, 2]), legend=False)
+            xt_pitch(events, team, color, ax=fig.add_subplot(gs[r2, 3]), vmax=xt_vmax)
+
+        # ---- footer
         ax_foot = fig.add_subplot(gs[7, :])
         ax_foot.axis("off")
         ax_foot.set_xlim(0, 1)
