@@ -269,6 +269,7 @@ def shot_half(events, team, color, short_names=None, ax=None):
     pitch = VerticalPitch(pitch_type="statsbomb", half=True, pitch_color=THEME["paper"],
                           line_color=THEME["pitch"], linewidth=0.9)
     pitch.draw(ax=ax)
+    ax.set_ylim(72, 121)          # attacking third and the box: the part that matters
     ax.set_anchor("N")
 
     goal = shots["shot_outcome"] == "Goal"
@@ -477,7 +478,7 @@ def match_report(match_id, left, right, left_color=None, right_color=None,
             height_ratios=[1, 1, 0.1, 1, 1, 0.22],
             hspace=0.24, wspace=0.05, left=0.015, right=0.99, top=0.985, bottom=0.01)
 
-        rail = gs[0:5, 0].subgridspec(6, 1, height_ratios=[1.35, 3.0, 0.25, 2.2, 0.35, 1.9],
+        rail = gs[0:5, 0].subgridspec(6, 1, height_ratios=[1.35, 3.0, 0.25, 1.75, 0.35, 2.35],
                                       hspace=0.10)
 
         # header: team pills side by side, score, then competition and date
