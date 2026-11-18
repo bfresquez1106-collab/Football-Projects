@@ -77,7 +77,7 @@ def _canvas(ax, **pitch_kwargs):
 
 
 def _title(ax, text):
-    ax.set_title(text, loc="left", fontsize=12 * FS, color=THEME["graphite"], pad=10)
+    ax.set_title(text, loc="left", fontsize=11 * FS, color=THEME["graphite"], pad=10)
 
 
 def _ramp(color):
@@ -181,7 +181,7 @@ def pass_panel(events, team, color, zone, ax=None):
                  color=color, alpha=0.85, width=1.5 * LW, headwidth=3.5,
                  headlength=3.5, zorder=2, ax=ax)
 
-    _title(ax, f"{title}  \u00b7  {done.sum()}/{len(p)}, {done.mean() * 100:.0f}% complete")
+    _title(ax, f"{title}  \u00b7  {done.sum()}/{len(p)} ({done.mean() * 100:.0f}%)")
     return ax
 
 
@@ -205,7 +205,7 @@ def pass_network(events, team, color, short_names=None, min_passes=5, max_links=
     pairs = pairs[pairs["count"] >= min_passes].nlargest(max_links, "count")
 
     pitch, ax = _canvas(ax)
-    _title(ax, "Pass network  \u00b7  completed passes, 5 or more")
+    _title(ax, "Pass network  \u00b7  5+ passes")
 
     for _, row in pairs.iterrows():
         a = row["player"]
@@ -221,20 +221,28 @@ def pass_network(events, team, color, short_names=None, min_passes=5, max_links=
                   edgecolors=THEME["paper"], linewidth=1.5 * LW, alpha=0.95,
                   zorder=2, ax=ax)
 
-    # labels: above the dot, else below, else further out; never on top of
-    # another label (width estimated from the text length)
-    placed = []
+    # labels: above the dot, else below, else further out; each candidate is
+    # measured at its real size and skipped if it would overlap a placed label
+    ax.apply_aspect()
+    renderer = ax.figure.canvas.get_renderer()
+    boxes = []
     for name, row in avg.sort_values("n", ascending=False).iterrows():
         label = short_names.get(name, name.split()[-1])
-        half = len(label) * 1.4
-        for dy, va in [(-3.5, "bottom"), (3.5, "top"), (-11, "bottom"), (11, "top")]:
-            ly = row["y"] + dy
-            if all(abs(row["x"] - px) > half + ph or abs(ly - py) > 7.5
-                   for px, py, ph in placed):
+        for dy, va in [(-3.5, "bottom"), (3.5, "top"), (-9, "bottom"), (9, "top"),
+                       (-14, "bottom"), (14, "top")]:
+            t = ax.text(row["x"], row["y"] + dy, label, ha="center", va=va,
+                        fontsize=11 * FS, fontweight="bold", color=THEME["ink"],
+                        path_effects=_halo(), zorder=4)
+            bb = t.get_window_extent(renderer).expanded(1.08, 1.15)
+            if not any(bb.overlaps(other) for other in boxes):
                 break
-        placed.append((row["x"], ly, half))
-        ax.text(row["x"], ly, label, ha="center", va=va, fontsize=11 * FS,
-                fontweight="bold", color=THEME["ink"], path_effects=_halo(), zorder=4)
+            t.remove()
+        else:
+            t = ax.text(row["x"], row["y"] - 3.5, label, ha="center", va="bottom",
+                        fontsize=11 * FS, fontweight="bold", color=THEME["ink"],
+                        path_effects=_halo(), zorder=4)
+            bb = t.get_window_extent(renderer)
+        boxes.append(bb)
 
     return ax
 
@@ -456,7 +464,7 @@ def match_report(match_id, left, right, left_color=None, right_color=None,
           "font.weight": "medium", "axes.titleweight": "medium"}
 
     with plt.rc_context(rc):
-        fig = plt.figure(figsize=(24, 13.5), facecolor=THEME["paper"])
+        fig = plt.figure(figsize=(24, 17), facecolor=THEME["paper"])
         # Left rail: score, stats table, shot map. Right: a block of six maps per
         # team (a thin team-colored rule marks each block, so no team names needed).
         gs = fig.add_gridspec(
