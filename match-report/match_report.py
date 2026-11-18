@@ -233,10 +233,13 @@ def pass_network(events, team, color, short_names=None, min_passes=5, max_links=
     boxes = []
     for name, row in avg.sort_values("n", ascending=False).iterrows():
         label = short_names.get(name, name.split()[-1])
-        for dx, dy, ha, va in [(0, -3.5, "center", "bottom"), (0, 3.5, "center", "top"),
-                               (3, 0, "left", "center"), (-3, 0, "right", "center"),
-                               (0, -9, "center", "bottom"), (0, 9, "center", "top"),
-                               (3, -6, "left", "bottom"), (-3, 6, "right", "top")]:
+        spots = []
+        for r in (3.5, 7, 11, 15, 20):
+            spots += [(0, -r, "center", "bottom"), (0, r, "center", "top"),
+                      (r * 0.85, 0, "left", "center"), (-r * 0.85, 0, "right", "center"),
+                      (r * 0.7, -r * 0.8, "left", "bottom"), (-r * 0.7, -r * 0.8, "right", "bottom"),
+                      (r * 0.7, r * 0.8, "left", "top"), (-r * 0.7, r * 0.8, "right", "top")]
+        for dx, dy, ha, va in spots:
             t = ax.text(row["x"] + dx, row["y"] + dy, label, ha=ha, va=va,
                         fontsize=11 * FS, fontweight="bold", color=THEME["ink"],
                         path_effects=_halo(), zorder=4)
@@ -266,17 +269,21 @@ def shot_half(events, team, color, short_names=None, ax=None):
     pitch = VerticalPitch(pitch_type="statsbomb", half=True, pitch_color=THEME["paper"],
                           line_color=THEME["pitch"], linewidth=0.9)
     pitch.draw(ax=ax)
+    ax.set_anchor("N")
 
     goal = shots["shot_outcome"] == "Goal"
-    size = shots["shot_statsbomb_xg"] * 1500 + 12
+    size = shots["shot_statsbomb_xg"] * 2600 + 25
     pitch.scatter(shots.loc[~goal, "x"], shots.loc[~goal, "y"], s=size[~goal],
                   facecolors="none", edgecolors=color, linewidths=1.3, zorder=2, ax=ax)
     pitch.scatter(shots.loc[goal, "x"], shots.loc[goal, "y"], s=size[goal],
                   color=color, edgecolors=THEME["ink"], linewidths=0.8, zorder=3, ax=ax)
-    for i in shots.index[goal]:
-        name = short_names.get(shots.loc[i, "player"], shots.loc[i, "player"].split()[-1])
-        pitch.annotate(name, xy=(shots.loc[i, "x"], shots.loc[i, "y"]),
-                       xytext=(shots.loc[i, "x"] - 5, shots.loc[i, "y"]),
+    scored = shots[goal]
+    for player, grp in scored.groupby("player"):
+        top = grp.loc[grp["shot_statsbomb_xg"].idxmax()]
+        name = short_names.get(player, player.split()[-1])
+        if len(grp) > 1:
+            name += f" \u00d7{len(grp)}"
+        pitch.annotate(name, xy=(top["x"], top["y"]), xytext=(top["x"] - 5, top["y"]),
                        ha="center", va="top", fontsize=11 * FS, color=THEME["ink"],
                        path_effects=_halo(), zorder=4, ax=ax)
     return shots["shot_statsbomb_xg"].sum()
@@ -459,18 +466,18 @@ def match_report(match_id, left, right, left_color=None, right_color=None,
 
     ink, graphite = THEME["ink"], THEME["graphite"]
     rc = {"font.family": "sans-serif", "font.sans-serif": THEME["font"],
-          "font.weight": "medium", "axes.titleweight": "medium"}
+          }
 
     with plt.rc_context(rc):
         fig = plt.figure(figsize=(24, 19), facecolor=THEME["paper"])
         # Left rail: header, stats table, two half-pitch shot maps (room is left
         # below for a momentum timeline later). Right: six maps per team.
         gs = fig.add_gridspec(
-            6, 4, width_ratios=[1.1, 1, 1, 1],
+            6, 4, width_ratios=[1.3, 1, 1, 1],
             height_ratios=[1, 1, 0.1, 1, 1, 0.22],
             hspace=0.24, wspace=0.05, left=0.015, right=0.99, top=0.985, bottom=0.01)
 
-        rail = gs[0:5, 0].subgridspec(6, 1, height_ratios=[1.35, 3.0, 0.22, 1.9, 0.32, 2.2],
+        rail = gs[0:5, 0].subgridspec(6, 1, height_ratios=[1.35, 3.0, 0.25, 2.2, 0.35, 1.9],
                                       hspace=0.10)
 
         # header: team pills side by side, score, then competition and date
@@ -479,7 +486,7 @@ def match_report(match_id, left, right, left_color=None, right_color=None,
         ax_head.set_xlim(0, 1)
         ax_head.set_ylim(0, 1)
         for team_name, color, x in [(left, left_color, 0.25), (right, right_color, 0.75)]:
-            _pill(ax_head, x, 0.84, team_name, color, 22 if len(team_name) <= 14 else 18)
+            _pill(ax_head, x, 0.84, team_name, color, 24 if len(team_name) <= 14 else 20)
         ax_head.text(0.5, 0.42, f"{goals(events, left)}\u2013{goals(events, right)}",
                      ha="center", va="center", fontsize=64, fontweight="bold", color=ink)
         if subtitle:
