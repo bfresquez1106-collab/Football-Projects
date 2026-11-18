@@ -27,6 +27,7 @@ jobs:
           MPLBACKEND: Agg
         working-directory: match-report
         run: |
+          mkdir -p ../renders
           python - <<'PY'
           from match_report import match_report
           match_report(18235, "Inter Milan", "Bayern Munich",
