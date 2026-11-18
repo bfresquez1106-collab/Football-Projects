@@ -228,10 +228,10 @@ def pass_network(events, team, color, short_names=None, min_passes=5, max_links=
     placed = []
     for name, row in avg.sort_values("n", ascending=False).iterrows():
         label = short_names.get(name, name.split()[-1])
-        for dy, va in [(-3.5, "bottom"), (3.5, "top"), (-8, "bottom"), (8, "top")]:
+        for dy, va in [(-3.5, "bottom"), (3.5, "top"), (-11, "bottom"), (11, "top")]:
             ly = row["y"] + dy
-            half = len(label) * 0.95
-            if all(abs(row["x"] - px) > half + ph or abs(ly - py) > 4.6
+            half = len(label) * 1.4
+            if all(abs(row["x"] - px) > half + ph or abs(ly - py) > 7.5
                    for px, py, ph in placed):
                 break
         placed.append((row["x"], ly, half))
