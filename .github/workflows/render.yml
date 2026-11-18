@@ -19,7 +19,13 @@ jobs:
           python-version: "3.11"
       - name: Install
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq fonts-roboto
+          sudo apt-get update -qq && sudo apt-get install -y -qq fonts-roboto fonts-paratype || true
+          fc-list | grep -i "pt sans" | head -2 || true
+          if ! fc-list | grep -qi "pt sans"; then
+            mkdir -p ~/.fonts
+            for f in Regular Bold; do curl -sSL -o ~/.fonts/PT_Sans-$f.ttf "https://github.com/google/fonts/raw/main/ofl/ptsans/PT_Sans-Web-$f.ttf"; done
+            fc-cache -f
+          fi
           pip install numpy pandas matplotlib mplsoccer statsbombpy
           python -c "import matplotlib.font_manager as fm; fm._load_fontmanager(try_read_cache=False)"
       - name: Build xT grid if missing
