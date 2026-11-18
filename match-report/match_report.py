@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
-from mplsoccer import Pitch, VerticalPitch
+from mplsoccer import Pitch
 from statsbombpy import sb
 
 warnings.filterwarnings("ignore")
@@ -259,44 +259,48 @@ def pass_network(events, team, color, short_names=None, min_passes=5, max_links=
 
 # ----------------------------------------------------------- shot maps
 
-def shot_half(events, team, color, short_names=None, ax=None):
-    """One team's shots on the half it attacks. Dot size = xG, filled = goal."""
+def shot_map(events, left_team, right_team, left_color, right_color,
+             short_names=None, ax=None):
+    """Both teams on one pitch. Dot size = xG, filled = goal."""
     short_names = short_names or {}
-    shots = events[(events["team"] == team) & (events["type"] == "Shot")].copy()
+    shots = events[events["type"] == "Shot"].copy()
     shots["x"] = shots["location"].apply(lambda loc: loc[0])
     shots["y"] = shots["location"].apply(lambda loc: loc[1])
 
-    pitch = VerticalPitch(pitch_type="statsbomb", half=True, pitch_color=THEME["paper"],
-                          line_color=THEME["pitch"], linewidth=0.9)
-    pitch.draw(ax=ax)
-    ax.set_ylim(72, 121)          # attacking third and the box: the part that matters
-    ax.set_anchor("N")
+    pitch, ax = _canvas(ax)
 
-    goal = shots["shot_outcome"] == "Goal"
-    size = shots["shot_statsbomb_xg"] * 2600 + 25
-    pitch.scatter(shots.loc[~goal, "x"], shots.loc[~goal, "y"], s=size[~goal],
-                  facecolors="none", edgecolors=color, linewidths=1.3, zorder=2, ax=ax)
-    pitch.scatter(shots.loc[goal, "x"], shots.loc[goal, "y"], s=size[goal],
-                  color=color, edgecolors=THEME["ink"], linewidths=0.8, zorder=3, ax=ax)
-    scored = shots[goal]
-    for player, grp in scored.groupby("player"):
-        top = grp.loc[grp["shot_statsbomb_xg"].idxmax()]
-        name = short_names.get(player, player.split()[-1])
-        if len(grp) > 1:
-            name += f" \u00d7{len(grp)}"
-        pitch.annotate(name, xy=(top["x"], top["y"]), xytext=(top["x"] - 5, top["y"]),
-                       ha="center", va="top", fontsize=11 * FS, color=THEME["ink"],
-                       path_effects=_halo(), zorder=4, ax=ax)
-    return shots["shot_statsbomb_xg"].sum()
+    totals = {}
+    for team, color, flip in [(right_team, right_color, False),
+                              (left_team, left_color, True)]:
+        s_ = shots[shots["team"] == team]
+        x, y = s_["x"], s_["y"]
+        if flip:                                   # left team attacks the left goal
+            x, y = 120 - x, 80 - y
+        goal = s_["shot_outcome"] == "Goal"
+        size = s_["shot_statsbomb_xg"] * 2000 + 25
 
+        pitch.scatter(x[~goal], y[~goal], s=size[~goal], facecolors="none",
+                      edgecolors=color, linewidths=1.3, zorder=2, ax=ax)
+        pitch.scatter(x[goal], y[goal], s=size[goal], color=color,
+                      edgecolors=THEME["ink"], linewidths=0.8, zorder=3, ax=ax)
 
-def _pill(ax, x, y, text, color, size, ha="center"):
-    """Rounded label in a team color; the text flips to dark on light fills."""
-    r, g, b = [int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
-    light = 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45
-    ax.text(x, y, text, ha=ha, va="center", fontsize=size, fontweight="bold",
-            color=THEME["ink"] if light else "white", zorder=3,
-            bbox=dict(boxstyle="round,pad=0.45,rounding_size=1.1", fc=color, ec="none"))
+        for player, grp in s_[goal].groupby("player"):
+            top = grp["shot_statsbomb_xg"].idxmax()
+            name = short_names.get(player, player.split()[-1])
+            if len(grp) > 1:
+                name += f" \u00d7{len(grp)}"
+            ax.text(x[top] + 2.5, y[top] - 3, name, fontsize=11 * FS,
+                    color=THEME["ink"], path_effects=_halo(), zorder=4)
+
+        totals[team] = s_["shot_statsbomb_xg"].sum()
+
+    ax.set_title(f"{totals[left_team]:.2f} xG", loc="left", fontsize=16 * FS,
+                 fontweight="bold", color=left_color, pad=10)
+    ax.set_title(f"{totals[right_team]:.2f} xG", loc="right", fontsize=16 * FS,
+                 fontweight="bold", color=right_color, pad=10)
+    ax.set_title("Shot map  \u00b7  size = xG", loc="center", fontsize=11 * FS,
+                 color=THEME["graphite"], pad=10)
+    return ax
 
 
 # ------------------------------------------------- PPDA and stats table
@@ -478,20 +482,23 @@ def match_report(match_id, left, right, left_color=None, right_color=None,
             height_ratios=[1, 1, 0.1, 1, 1, 0.22],
             hspace=0.24, wspace=0.05, left=0.015, right=0.99, top=0.985, bottom=0.01)
 
-        rail = gs[0:5, 0].subgridspec(6, 1, height_ratios=[1.35, 3.0, 0.25, 1.75, 0.35, 2.35],
-                                      hspace=0.10)
+        rail = gs[0:5, 0].subgridspec(4, 1, height_ratios=[1.0, 3.0, 2.9, 2.0],
+                                      hspace=0.16)
 
-        # header: team pills side by side, score, then competition and date
+        # header: team names side by side with the score between, date below
         ax_head = fig.add_subplot(rail[0])
         ax_head.axis("off")
         ax_head.set_xlim(0, 1)
         ax_head.set_ylim(0, 1)
-        for team_name, color, x in [(left, left_color, 0.25), (right, right_color, 0.75)]:
-            _pill(ax_head, x, 0.84, team_name, color, 24 if len(team_name) <= 14 else 20)
-        ax_head.text(0.5, 0.42, f"{goals(events, left)}\u2013{goals(events, right)}",
-                     ha="center", va="center", fontsize=64, fontweight="bold", color=ink)
+        size = 24 if max(len(left), len(right)) <= 13 else 19
+        ax_head.text(0.0, 0.62, left, ha="left", va="center", fontsize=size,
+                     fontweight="bold", color=left_color)
+        ax_head.text(1.0, 0.62, right, ha="right", va="center", fontsize=size,
+                     fontweight="bold", color=right_color)
+        ax_head.text(0.5, 0.62, f"{goals(events, left)}\u2013{goals(events, right)}",
+                     ha="center", va="center", fontsize=54, fontweight="bold", color=ink)
         if subtitle:
-            ax_head.text(0.5, 0.06, subtitle, ha="center", va="center",
+            ax_head.text(0.5, 0.12, subtitle, ha="center", va="center",
                          fontsize=13 * FS, color=graphite)
 
         # stats table
@@ -503,21 +510,11 @@ def match_report(match_id, left, right, left_color=None, right_color=None,
         ax_stats.scatter([0.69], [y_head], s=420, color=left_color, clip_on=False)
         ax_stats.scatter([0.97], [y_head], s=420, color=right_color, clip_on=False)
 
-        # shot maps: one half pitch per team, side by side, xG pill under each
-        ax_st = fig.add_subplot(rail[2])
-        ax_st.axis("off")
-        ax_st.text(0.0, 0.3, "Shots  \u00b7  dot size = xG, filled = goal", ha="left",
-                   va="center", fontsize=11 * FS, color=graphite)
-        halves = rail[3].subgridspec(1, 2, wspace=0.06)
-        pills = rail[4].subgridspec(1, 2, wspace=0.06)
-        for k, (team_name, color) in enumerate([(left, left_color), (right, right_color)]):
-            xg = shot_half(events, team_name, color, short_names,
-                           ax=fig.add_subplot(halves[k]))
-            ax_p = fig.add_subplot(pills[k])
-            ax_p.axis("off")
-            ax_p.set_xlim(0, 1)
-            ax_p.set_ylim(0, 1)
-            _pill(ax_p, 0.5, 0.5, f"{xg:.1f} xG", color, 18)
+        # shot map: one pitch (room below it is kept for a momentum timeline)
+        shot_map(events, left, right, left_color, right_color, short_names,
+                 ax=fig.add_subplot(rail[2]))
+        ax_rail_free = fig.add_subplot(rail[3])      # reserved for the timeline
+        ax_rail_free.axis("off")
 
         # six maps per team
         for team, color, first_row in [(left, left_color, 0), (right, right_color, 3)]:
