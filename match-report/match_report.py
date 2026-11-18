@@ -30,7 +30,7 @@ THEME = {
     "ink":      "#2B2D42",     # text, key marks (deep indigo)
     "graphite": "#5E6178",     # pitch lines, secondary text
     "stone":    "#B9C4C0",     # misses, clearances, quiet marks
-    "pitch":    "#C3CDC8",     # pitch lines: quieter than the data
+    "pitch":    "#B4BFBA",     # pitch lines: quieter than the data
     "team_a":   "#3581B8",     # left team (blue)
     "team_b":   "#C33149",     # right team (crimson)
     "accent":   "#499167",     # the one highlight (green)
@@ -230,9 +230,11 @@ def pass_network(events, team, color, short_names=None, min_passes=5, max_links=
         label = short_names.get(name, name.split()[-1])
         for dy, va in [(-3.5, "bottom"), (3.5, "top"), (-8, "bottom"), (8, "top")]:
             ly = row["y"] + dy
-            if all(abs(row["x"] - px) > 15 or abs(ly - py) > 4.2 for px, py in placed):
+            half = len(label) * 0.95
+            if all(abs(row["x"] - px) > half + ph or abs(ly - py) > 4.6
+                   for px, py, ph in placed):
                 break
-        placed.append((row["x"], ly))
+        placed.append((row["x"], ly, half))
         ax.text(row["x"], ly, label, ha="center", va=va, fontsize=11 * FS,
                 fontweight="bold", color=THEME["ink"], path_effects=_halo(), zorder=4)
 
@@ -276,11 +278,13 @@ def shot_map(events, left_team, right_team, left_color, right_color,
 
         totals[team] = s["shot_statsbomb_xg"].sum()
 
-    _title(ax, "Shot map  \u00b7  dot size = xG, filled = goal")
-    ax.text(0, 88, f"{totals[left_team]:.2f} xG", ha="left", va="top",
-            fontsize=16 * FS, fontweight="bold", color=left_color)
-    ax.text(120, 88, f"{totals[right_team]:.2f} xG", ha="right", va="top",
-            fontsize=16 * FS, fontweight="bold", color=right_color)
+    ink = THEME["ink"]
+    ax.set_title(f"{totals[left_team]:.2f} xG", loc="left", fontsize=16 * FS,
+                 fontweight="bold", color=left_color, pad=10)
+    ax.set_title(f"{totals[right_team]:.2f} xG", loc="right", fontsize=16 * FS,
+                 fontweight="bold", color=right_color, pad=10)
+    ax.set_title("Shot map  \u00b7  size = xG", loc="center", fontsize=12 * FS,
+                 color=THEME["graphite"], pad=10)
     return ax
 
 
