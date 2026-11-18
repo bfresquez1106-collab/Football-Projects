@@ -30,7 +30,7 @@ THEME = {
     "ink":      "#2B2D42",     # text, key marks (deep indigo)
     "graphite": "#5E6178",     # pitch lines, secondary text
     "stone":    "#B9C4C0",     # misses, clearances, quiet marks
-    "pitch":    "#B4BFBA",     # pitch lines: quieter than the data
+    "pitch":    "#C3CDC8",     # pitch lines: quieter than the data
     "team_a":   "#3581B8",     # left team (blue)
     "team_b":   "#C33149",     # right team (crimson)
     "accent":   "#499167",     # the one highlight (green)
@@ -59,7 +59,7 @@ NX, NY = 16, 12
 try:
     XT16 = np.load(Path(__file__).parent / "xt16.npy")
 except FileNotFoundError:
-    XT16 = None          # only needed for the optional xT map
+    XT16 = None          # needed only for the xT map
 
 
 # ----------------------------------------------------- small helpers
@@ -157,7 +157,7 @@ ZONES = {
 }
 
 
-def pass_panel(events, team, color, zone, ax=None, max_arrows=20):
+def pass_panel(events, team, color, zone, ax=None):
     title, rule = ZONES[zone]
 
     p = events[(events["team"] == team) & (events["type"] == "Pass")]
@@ -172,18 +172,16 @@ def pass_panel(events, team, color, zone, ax=None, max_arrows=20):
 
     pitch, ax = _canvas(ax)
 
-    # misses: a small stone dot where the pass ended, no line
+    # misses in stone underneath, completed passes in the team color on top
     miss, hit = p[~done], p[done]
-    pitch.scatter(miss["end_x"], miss["end_y"], s=28, color=THEME["stone"],
-                  alpha=0.9, zorder=1, ax=ax)
+    pitch.arrows(miss["x"], miss["y"], miss["end_x"], miss["end_y"],
+                 color=THEME["stone"], alpha=0.8, width=1.5 * LW, headwidth=3.5,
+                 headlength=3.5, zorder=1, ax=ax)
+    pitch.arrows(hit["x"], hit["y"], hit["end_x"], hit["end_y"],
+                 color=color, alpha=0.85, width=1.5 * LW, headwidth=3.5,
+                 headlength=3.5, zorder=2, ax=ax)
 
-    # completed passes: only the most forward ones when there are too many
-    shown = hit.assign(gain=hit["end_x"] - hit["x"]).nlargest(max_arrows, "gain")
-    pitch.arrows(shown["x"], shown["y"], shown["end_x"], shown["end_y"],
-                 color=color, alpha=0.8, width=1.8 * LW, headwidth=4,
-                 headlength=4, zorder=2, ax=ax)
-
-    _title(ax, f"{title}  \u00b7  {done.sum()}/{len(p)} complete")
+    _title(ax, f"{title}  \u00b7  {done.sum()}/{len(p)}, {done.mean() * 100:.0f}% complete")
     return ax
 
 
@@ -207,7 +205,7 @@ def pass_network(events, team, color, short_names=None, min_passes=5, max_links=
     pairs = pairs[pairs["count"] >= min_passes].nlargest(max_links, "count")
 
     pitch, ax = _canvas(ax)
-    _title(ax, "Pass network")
+    _title(ax, "Pass network  \u00b7  completed passes, 5 or more")
 
     for _, row in pairs.iterrows():
         a = row["player"]
@@ -223,14 +221,14 @@ def pass_network(events, team, color, short_names=None, min_passes=5, max_links=
                   edgecolors=THEME["paper"], linewidth=1.5 * LW, alpha=0.95,
                   zorder=2, ax=ax)
 
-    # labels: try above the dot, then below, then further out, skipping any
-    # spot that would overlap a label already placed
+    # labels: above the dot, else below, else further out; never on top of
+    # another label (width estimated from the text length)
     placed = []
     for name, row in avg.sort_values("n", ascending=False).iterrows():
         label = short_names.get(name, name.split()[-1])
+        half = len(label) * 1.4
         for dy, va in [(-3.5, "bottom"), (3.5, "top"), (-11, "bottom"), (11, "top")]:
             ly = row["y"] + dy
-            half = len(label) * 1.4
             if all(abs(row["x"] - px) > half + ph or abs(ly - py) > 7.5
                    for px, py, ph in placed):
                 break
@@ -278,7 +276,6 @@ def shot_map(events, left_team, right_team, left_color, right_color,
 
         totals[team] = s["shot_statsbomb_xg"].sum()
 
-    ink = THEME["ink"]
     ax.set_title(f"{totals[left_team]:.2f} xG", loc="left", fontsize=16 * FS,
                  fontweight="bold", color=left_color, pad=10)
     ax.set_title(f"{totals[right_team]:.2f} xG", loc="right", fontsize=16 * FS,
@@ -324,12 +321,16 @@ def stats_panel(events, left_team, right_team, left_color, right_color, ax,
             f"{len(shots)}",
             f"{shots['shot_statsbomb_xg'].sum():.2f}",
             f"{shots['shot_statsbomb_xg'].mean():.2f}",
-            f"{n_pass[t] / sum(n_pass.values()) * 100:.0f}%",
-            f"{n_ft[t] / sum(n_ft.values()) * 100:.0f}%",
+            f"{n_pass[t] / sum(n_pass.values()) * 100:.1f}",
+            f"{n_ft[t] / sum(n_ft.values()) * 100:.1f}",
+            f"{(mine['pass_cross'] == True).sum()}",
+            f"{(mine['pass_type'] == 'Corner').sum()}",
+            f"{fouls}",
             f"{ppda(events, t):.1f}",
         ]
 
-    labels = ["Shots", "xG", "xG per shot", "Possession", "Field tilt", "PPDA"]
+    labels = ["Shots", "xG", "xG per shot", "Possession %", "Field tilt %",
+              "Crosses", "Corners", "Fouls", "PPDA"]
 
     # drawn by hand: a header, then one hairline-separated row per stat
     ax.axis("off")
@@ -361,8 +362,12 @@ def stats_panel(events, left_team, right_team, left_color, right_color, ax,
 # ------------------------------------------------- defensive actions
 
 STYLES = {                       # kind: (marker, face color, edge color)
+    "Ball recovery": ("o", THEME["paper"], THEME["ink"]),
+    "Clearance":     ("s", THEME["stone"], THEME["graphite"]),
     "Interception":  ("D", THEME["ink"], THEME["ink"]),
+    "Block":         ("v", THEME["paper"], THEME["ink"]),
     "Won tackle":    ("o", THEME["ink"], THEME["ink"]),
+    "Lost tackle":   ("X", THEME["paper"], THEME["ink"]),
 }
 WON = ["Won", "Success In Play", "Success Out"]
 LOST = ["Lost In Play", "Lost Out"]
@@ -384,7 +389,7 @@ def defensive_actions(events, team, ax=None, legend=True):
         ["Ball recovery", "Clearance", "Interception", "Block",
          "Won tackle", "Lost tackle"],
         default="other")
-    d = d[d["kind"].isin(list(STYLES))]
+    d = d[d["kind"] != "other"]
 
     pitch, ax = _canvas(ax)
 
@@ -451,70 +456,79 @@ def match_report(match_id, left, right, left_color=None, right_color=None,
           "font.weight": "medium", "axes.titleweight": "medium"}
 
     with plt.rc_context(rc):
-        fig = plt.figure(figsize=(24, 10.5), facecolor=THEME["paper"])
-        # Left rail: score, stats, shot map. Right: three maps per team, each
-        # block headed by a thin rule in the team's color (no names needed).
+        fig = plt.figure(figsize=(24, 13.5), facecolor=THEME["paper"])
+        # Left rail: score, stats table, shot map. Right: a block of six maps per
+        # team (a thin team-colored rule marks each block, so no team names needed).
         gs = fig.add_gridspec(
-            5, 4, width_ratios=[1.25, 1, 1, 1],
-            height_ratios=[0.04, 1, 0.04, 1, 0.16],
-            hspace=0.22, wspace=0.07, left=0.02, right=0.985, top=0.98, bottom=0.015)
+            7, 4, width_ratios=[1.45, 1, 1, 1],
+            height_ratios=[0.05, 1, 1, 0.05, 1, 1, 0.3],
+            hspace=0.28, wspace=0.06, left=0.02, right=0.99, top=0.985, bottom=0.01)
 
         # ---- left rail
-        rail = gs[0:4, 0].subgridspec(3, 1, height_ratios=[1.3, 2.2, 2.6], hspace=0.12)
+        rail = gs[0:6, 0].subgridspec(3, 1, height_ratios=[1.6, 3.0, 4.6], hspace=0.10)
 
         ax_head = fig.add_subplot(rail[0])
         ax_head.axis("off")
         ax_head.set_xlim(0, 1)
         ax_head.set_ylim(0, 1)
-        ax_head.text(0.0, 0.95, left, ha="left", va="top", fontsize=26,
+        ax_head.text(0.0, 0.93, left, ha="left", va="top", fontsize=28,
                      fontweight="bold", color=left_color)
-        ax_head.text(0.0, 0.66, right, ha="left", va="top", fontsize=26,
+        ax_head.text(0.0, 0.63, right, ha="left", va="top", fontsize=28,
                      fontweight="bold", color=right_color)
-        ax_head.text(1.0, 0.72, f"{goals(events, left)}\u2013{goals(events, right)}",
-                     ha="right", va="center", fontsize=64, fontweight="bold", color=ink)
+        ax_head.text(1.0, 0.70, f"{goals(events, left)}\u2013{goals(events, right)}",
+                     ha="right", va="center", fontsize=72, fontweight="bold", color=ink)
         if subtitle:
             ax_head.text(0.0, 0.22, subtitle, ha="left", va="top",
-                         fontsize=13 * FS, color=graphite)
+                         fontsize=14 * FS, color=graphite)
+        ax_head.plot([0, 1], [0.0, 0.0], color=ink, lw=1.2 * LW, clip_on=False)
 
         ax_stats = fig.add_subplot(rail[1])
-        step = 0.13
+        step = 0.088
         stats_panel(events, left, right, left_color, right_color, ax=ax_stats,
                     step=step, x_left=0.72, show_names=False)
-        y_head = 0.5 + 7 * step / 2 - step / 2          # header row of the table
+        y_head = 0.5 + 10 * step / 2 - step / 2          # header row of the table
         ax_stats.scatter([0.69], [y_head], s=420, color=left_color, clip_on=False)
         ax_stats.scatter([0.97], [y_head], s=420, color=right_color, clip_on=False)
 
         shot_map(events, left, right, left_color, right_color, short_names,
                  ax=fig.add_subplot(rail[2]))
 
-        # ---- three maps per team
-        for team, color, rule_row, map_row in [(left, left_color, 0, 1),
-                                               (right, right_color, 2, 3)]:
+        # ---- one block of six maps per team, headed by a team-colored rule
+        for team, color, rule_row, first_row in [(left, left_color, 0, 1),
+                                                 (right, right_color, 3, 4)]:
             ax_rule = fig.add_subplot(gs[rule_row, 1:4])
             ax_rule.axis("off")
             ax_rule.set_xlim(0, 1)
             ax_rule.set_ylim(0, 1)
             ax_rule.plot([0, 1], [0.5, 0.5], color=color, lw=6, solid_capstyle="butt",
                          clip_on=False)
-            pass_network(events, team, color, short_names, ax=fig.add_subplot(gs[map_row, 1]))
-            pass_panel(events, team, color, "into_final_third", ax=fig.add_subplot(gs[map_row, 2]))
-            defensive_actions(events, team, ax=fig.add_subplot(gs[map_row, 3]), legend=False)
 
-        # ---- footer: one quiet line
-        ax_foot = fig.add_subplot(gs[4, :])
+            r1, r2 = first_row, first_row + 1
+            pass_network(events, team, color, short_names, ax=fig.add_subplot(gs[r1, 1]))
+            pass_panel(events, team, color, "in_final_third", ax=fig.add_subplot(gs[r1, 2]))
+            pass_panel(events, team, color, "into_final_third", ax=fig.add_subplot(gs[r1, 3]))
+            pass_panel(events, team, color, "to_box", ax=fig.add_subplot(gs[r2, 1]))
+            defensive_actions(events, team, ax=fig.add_subplot(gs[r2, 2]), legend=False)
+            xt_pitch(events, team, color, ax=fig.add_subplot(gs[r2, 3]), vmax=xt_vmax)
+
+        # ---- footer: legend, how-to-read note, credit
+        ax_foot = fig.add_subplot(gs[6, :])
         ax_foot.axis("off")
         ax_foot.set_xlim(0, 1)
         ax_foot.set_ylim(0, 1)
-        handles = [Line2D([0], [0], marker=m, linestyle="none", markersize=10,
+        handles = [Line2D([0], [0], marker=m, linestyle="none", markersize=11,
                           markerfacecolor=face, markeredgecolor=edge, label=kind)
                    for kind, (m, face, edge) in STYLES.items()]
         handles.append(Line2D([0], [0], color=THEME["accent"], lw=2.5 * LW,
                               label="Average height"))
-        ax_foot.legend(handles=handles, loc="center left", ncol=4, frameon=False,
-                       fontsize=11 * FS, labelcolor=ink, columnspacing=1.6,
-                       handletextpad=0.4)
-        ax_foot.text(1.0, 0.5, "Attacking left to right   \u00b7   StatsBomb open data",
-                     ha="right", va="center", fontsize=11 * FS, color=graphite)
+        ax_foot.legend(handles=handles, loc="upper left", ncol=7, frameon=False,
+                       fontsize=11 * FS, labelcolor=ink, bbox_to_anchor=(0.0, 1.0),
+                       columnspacing=1.6, handletextpad=0.4)
+        ax_foot.text(0.0, 0.08,
+                     "Pass and defensive maps attack left to right   \u00b7   "
+                     "xT added = value of end zone minus start zone (completed passes "
+                     "and carries, positive gains only)   \u00b7   Data: StatsBomb open data",
+                     ha="left", va="bottom", fontsize=10 * FS, color=graphite)
 
         fig.savefig(save_as or f"match_report_{match_id}.png", dpi=130,
                     facecolor=THEME["paper"], bbox_inches="tight")
