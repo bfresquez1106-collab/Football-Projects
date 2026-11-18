@@ -157,7 +157,7 @@ ZONES = {
 }
 
 
-def pass_panel(events, team, color, zone, ax=None, max_arrows=30):
+def pass_panel(events, team, color, zone, ax=None, max_arrows=20):
     title, rule = ZONES[zone]
 
     p = events[(events["team"] == team) & (events["type"] == "Pass")]
@@ -180,11 +180,10 @@ def pass_panel(events, team, color, zone, ax=None, max_arrows=30):
     # completed passes: only the most forward ones when there are too many
     shown = hit.assign(gain=hit["end_x"] - hit["x"]).nlargest(max_arrows, "gain")
     pitch.arrows(shown["x"], shown["y"], shown["end_x"], shown["end_y"],
-                 color=color, alpha=0.8, width=2.2 * LW, headwidth=4,
+                 color=color, alpha=0.8, width=1.8 * LW, headwidth=4,
                  headlength=4, zorder=2, ax=ax)
 
-    note = f"  \u00b7  {len(shown)} most forward shown" if len(hit) > max_arrows else ""
-    _title(ax, f"{title}  \u00b7  {done.sum()}/{len(p)} complete{note}")
+    _title(ax, f"{title}  \u00b7  {done.sum()}/{len(p)} complete")
     return ax
 
 
@@ -224,12 +223,18 @@ def pass_network(events, team, color, short_names=None, min_passes=5, max_links=
                   edgecolors=THEME["paper"], linewidth=1.5 * LW, alpha=0.95,
                   zorder=2, ax=ax)
 
-    # labels sit just above each dot, with a paper halo so they stay readable
-    for name, row in avg.iterrows():
+    # labels: try above the dot, then below, then further out, skipping any
+    # spot that would overlap a label already placed
+    placed = []
+    for name, row in avg.sort_values("n", ascending=False).iterrows():
         label = short_names.get(name, name.split()[-1])
-        ax.text(row["x"], row["y"] - 3.5, label, ha="center", va="bottom",
-                fontsize=11 * FS, fontweight="bold", color=THEME["ink"],
-                path_effects=_halo(), zorder=4)
+        for dy, va in [(-3.5, "bottom"), (3.5, "top"), (-8, "bottom"), (8, "top")]:
+            ly = row["y"] + dy
+            if all(abs(row["x"] - px) > 15 or abs(ly - py) > 4.2 for px, py in placed):
+                break
+        placed.append((row["x"], ly))
+        ax.text(row["x"], ly, label, ha="center", va=va, fontsize=11 * FS,
+                fontweight="bold", color=THEME["ink"], path_effects=_halo(), zorder=4)
 
     return ax
 
@@ -256,7 +261,7 @@ def shot_map(events, left_team, right_team, left_color, right_color,
             x, y = 120 - x, 80 - y
 
         goal = s["shot_outcome"] == "Goal"
-        size = s["shot_statsbomb_xg"] * 1000
+        size = s["shot_statsbomb_xg"] * 1800
 
         pitch.scatter(x[~goal], y[~goal], s=size[~goal],
                       color=color, alpha=0.35, zorder=2, ax=ax)
@@ -271,13 +276,11 @@ def shot_map(events, left_team, right_team, left_color, right_color,
 
         totals[team] = s["shot_statsbomb_xg"].sum()
 
-    _title(ax, "Shot map")
-    ax.text(0, 87, f"{left_team}  {totals[left_team]:.2f} xG", ha="left", va="top",
-            fontsize=12 * FS, color=left_color)
-    ax.text(120, 87, f"{right_team}  {totals[right_team]:.2f} xG", ha="right", va="top",
-            fontsize=12 * FS, color=right_color)
-    ax.text(60, 87, "Dot size = xG, filled = goal", ha="center", va="top",
-            fontsize=11 * FS, color=THEME["graphite"])
+    _title(ax, "Shot map  \u00b7  dot size = xG, filled = goal")
+    ax.text(0, 88, f"{totals[left_team]:.2f} xG", ha="left", va="top",
+            fontsize=16 * FS, fontweight="bold", color=left_color)
+    ax.text(120, 88, f"{totals[right_team]:.2f} xG", ha="right", va="top",
+            fontsize=16 * FS, fontweight="bold", color=right_color)
     return ax
 
 
@@ -354,7 +357,6 @@ def stats_panel(events, left_team, right_team, left_color, right_color, ax,
 # ------------------------------------------------- defensive actions
 
 STYLES = {                       # kind: (marker, face color, edge color)
-    "Ball recovery": ("o", THEME["paper"], THEME["ink"]),
     "Interception":  ("D", THEME["ink"], THEME["ink"]),
     "Won tackle":    ("o", THEME["ink"], THEME["ink"]),
 }
@@ -445,7 +447,7 @@ def match_report(match_id, left, right, left_color=None, right_color=None,
           "font.weight": "medium", "axes.titleweight": "medium"}
 
     with plt.rc_context(rc):
-        fig = plt.figure(figsize=(24, 12), facecolor=THEME["paper"])
+        fig = plt.figure(figsize=(24, 10.5), facecolor=THEME["paper"])
         # Left rail: score, stats, shot map. Right: three maps per team, each
         # block headed by a thin rule in the team's color (no names needed).
         gs = fig.add_gridspec(
@@ -475,10 +477,8 @@ def match_report(match_id, left, right, left_color=None, right_color=None,
         stats_panel(events, left, right, left_color, right_color, ax=ax_stats,
                     step=step, x_left=0.72, show_names=False)
         y_head = 0.5 + 7 * step / 2 - step / 2          # header row of the table
-        ax_stats.text(0.72, y_head, "\u25CF", ha="right", va="center", fontsize=20 * FS,
-                      color=left_color)
-        ax_stats.text(1.0, y_head, "\u25CF", ha="right", va="center", fontsize=20 * FS,
-                      color=right_color)
+        ax_stats.scatter([0.69], [y_head], s=420, color=left_color, clip_on=False)
+        ax_stats.scatter([0.97], [y_head], s=420, color=right_color, clip_on=False)
 
         shot_map(events, left, right, left_color, right_color, short_names,
                  ax=fig.add_subplot(rail[2]))
@@ -509,7 +509,7 @@ def match_report(match_id, left, right, left_color=None, right_color=None,
         ax_foot.legend(handles=handles, loc="center left", ncol=4, frameon=False,
                        fontsize=11 * FS, labelcolor=ink, columnspacing=1.6,
                        handletextpad=0.4)
-        ax_foot.text(1.0, 0.5, "Attacking left to right \u2192   \u00b7   StatsBomb open data",
+        ax_foot.text(1.0, 0.5, "Attacking left to right   \u00b7   StatsBomb open data",
                      ha="right", va="center", fontsize=11 * FS, color=graphite)
 
         fig.savefig(save_as or f"match_report_{match_id}.png", dpi=130,
