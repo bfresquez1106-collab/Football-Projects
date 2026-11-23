@@ -26,15 +26,17 @@ warnings.filterwarnings("ignore")
 # Rams x Eames: warm paper, near-black ink, one pair of team colors,
 # one highlight color (the average defensive line).
 THEME = {
-    "paper":    "#FCF7F8",     # background
+    "paper":    "#FFFAF5",     # background (ivory)
     "ink":      "#1F1F1F",     # text, key marks
     "graphite": "#505468",     # secondary text
-    "stone":    "#CFCDD3",     # misses, quiet marks (tint of graphite)
-    "pitch":    "#B9B7C0",     # pitch lines
-    "team_a":   "#63ADF2",     # left team (light blue)
-    "team_b":   "#E03616",     # right team (red)
+    "stone":    "#D9D3CB",     # misses, quiet marks (warm gray)
+    "pitch":    "#C2BCB3",     # pitch lines
+    "team_a":   "#64A4CC",     # left team (blue)
+    "team_b":   "#B26864",     # right team (brick red)
     "font":     ["PT Sans", "Roboto", "Segoe UI", "Arial", "DejaVu Sans"],
 }
+# Spare colors from the same set, if you want to swap a team color:
+#   teal "#368D7F"    orange "#E7AB63"
 
 # One-knob sizing: raise these to make text and lines bigger everywhere.
 FS = 1.4    # font scale
