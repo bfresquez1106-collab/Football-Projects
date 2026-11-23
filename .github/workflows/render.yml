@@ -49,7 +49,7 @@ jobs:
                        subtitle="Champions League final, 22 May 2010",
                        save_as="../renders/inter_bayern.png")
           match_report(18236, "Barcelona", "Manchester United",
-                       left_color="#235C53", right_color="#E8BF6D",
+                       left_color="#235C53", right_color="#D1A044",
                        subtitle="Champions League final, 27 May 2009",
                        save_as="../renders/barca_manutd.png")
           PY

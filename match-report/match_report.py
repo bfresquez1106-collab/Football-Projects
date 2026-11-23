@@ -301,12 +301,18 @@ def shot_map(events, left_team, right_team, left_color, right_color,
         pitch.scatter(x[goal], y[goal], s=size[goal], color=color,
                       edgecolors=THEME["ink"], linewidths=0.8, zorder=3, ax=ax)
 
+        placed = []   # label anchors so close scorers do not overprint
         for player, grp in s_[goal].groupby("player"):
             top = grp["shot_statsbomb_xg"].idxmax()
             name = short_names.get(player, player.split()[-1])
             if len(grp) > 1:
                 name += f" \u00d7{len(grp)}"
-            ax.text(x[top] + 2.5, y[top] - 3, name, fontsize=11 * FS,
+            lx, ly = x[top] + 2.5, y[top] - 3
+            for px, py in placed:
+                if abs(lx - px) < 14 and abs(ly - py) < 4.5:
+                    ly = py + 4.5
+            placed.append((lx, ly))
+            ax.text(lx, ly, name, fontsize=11 * FS,
                     color=THEME["ink"], path_effects=_halo(), zorder=4)
 
         totals[team] = s_["shot_statsbomb_xg"].sum()
@@ -467,7 +473,7 @@ def auto_short_names(match_id):
 
 
 def match_report(match_id, left, right, left_color=None, right_color=None,
-                 short_names=None, subtitle=None, save_as=None, xt_vmax=0.3):
+                 short_names=None, subtitle=None, save_as=None, xt_vmax=None):
     left_color = left_color or THEME["team_a"]
     right_color = right_color or THEME["team_b"]
 
@@ -532,6 +538,16 @@ def match_report(match_id, left, right, left_color=None, right_color=None,
                  ax=fig.add_subplot(rail[2]))
         ax_rail_free = fig.add_subplot(rail[3])      # reserved for the timeline
         ax_rail_free.axis("off")
+
+        # one shared xT color scale so the two teams stay comparable
+        if xt_vmax is None:
+            tops = []
+            for t in (left, right):
+                m = xt_moves(events, t)
+                h, _, _ = np.histogram2d(m["x"], m["y"], bins=(8, 6),
+                                         range=[[0, 120], [0, 80]], weights=m["xt"])
+                tops.append(h.max())
+            xt_vmax = max(0.1, round(max(tops) * 1.05, 2))
 
         # six maps per team
         for team, color, first_row in [(left, left_color, 0), (right, right_color, 3)]:
