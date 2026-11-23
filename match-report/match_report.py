@@ -29,6 +29,7 @@ THEME = {
     "paper":    "#ECEBDE",     # background (cream)
     "ink":      "#1F1F1F",     # text, key marks
     "graphite": "#505468",     # secondary text
+    "miss":     "#9E9C8A",     # missed passes: readable, but quiet
     "stone":    "#CBC9BA",     # misses, quiet marks (olive-gray)
     "pitch":    "#A9A797",     # pitch lines
     "team_a":   "#355070",     # left team (navy)
@@ -190,7 +191,7 @@ def pass_panel(events, team, color, zone, ax=None):
     # misses: faint hairlines underneath
     miss, hit = p[~done], p[done]
     pitch.arrows(miss["x"], miss["y"], miss["end_x"], miss["end_y"],
-                 color=THEME["stone"], alpha=0.7, width=0.7, headwidth=3,
+                 color=THEME["miss"], alpha=0.8, width=0.8, headwidth=3,
                  headlength=3, zorder=1, ax=ax)
 
     # completed passes in the team color; the longer the pass, the heavier the line
