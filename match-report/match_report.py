@@ -81,8 +81,23 @@ def _title(ax, text):
 
 
 def _ramp(color):
-    """Heatmap ramp: fades from the paper color into a team color."""
-    return LinearSegmentedColormap.from_list("ramp", [THEME["paper"], color])
+    """Heatmap ramp: fades from the paper color into a team color.
+
+    The hue stays the team's own all the way up (a plain blend of cream and a
+    dark navy passes through gray), so low values read as pale blue or pale red.
+    """
+    import colorsys
+    from matplotlib.colors import to_rgb
+    h, s_end, v_end = colorsys.rgb_to_hsv(*to_rgb(color))
+    _, _, v_paper = colorsys.rgb_to_hsv(*to_rgb(THEME["paper"]))
+    stops = []
+    for t in np.linspace(0, 1, 9):
+        if t == 0:
+            stops.append(to_rgb(THEME["paper"]))
+        else:
+            stops.append(colorsys.hsv_to_rgb(h, s_end * t ** 0.7,
+                                             v_paper + (v_end - v_paper) * t))
+    return LinearSegmentedColormap.from_list("ramp", stops)
 
 
 def _halo():
